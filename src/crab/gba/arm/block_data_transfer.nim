@@ -8,14 +8,12 @@ proc arm_block_data_transfer*(cpu: CPU; instr: uint32) =
   let load        = bit(instr, 20)
   let rn          = int(bits_range(instr, 16, 19))
   var list        = bits_range(instr, 0, 15)
+  var saved_mode: uint32 = 0
   if s_bit:
     if bit(list, 15):
       raise newException(Exception, "todo: handle cases with r15 in list")
-    let mode = cpu.cpsr.mode
+    saved_mode = cpu.cpsr.mode
     cpu.switch_mode(modeUSR)
-    # use a defer-like approach: we re-switch after
-    defer:
-      cpu.switch_mode(CpuMode(mode))
   var address   = cpu.r[rn]
   var bits_set  = count_set_bits(list)
   if bits_set == 0:
@@ -40,4 +38,6 @@ proc arm_block_data_transfer*(cpu: CPU; instr: uint32) =
       if write_back and not first_transfer and not (load and bit(list, rn)):
         discard cpu.set_reg(rn, final_addr)
       first_transfer = true
+  if s_bit:
+    cpu.switch_mode(CpuMode(saved_mode))
   if not (load and bit(list, 15)): cpu.step_arm()
