@@ -77,14 +77,14 @@ proc main() =
   if bios_path != "" and not fileExists(bios_path):
     echo "BIOS file not found: " & bios_path; quit(1)
 
-  # Initialize GBA
-  let gba_emu = new_gba(bios_path, rom_path, run_bios)
-  gba_emu.post_init()
-
-  # Initialize SDL2
+  # Initialize SDL2 first (APU opens audio device during GBA init)
   if sdl2.init(INIT_VIDEO or INIT_AUDIO) != SdlSuccess:
     echo "SDL2 init failed: ", $sdl2.getError(); quit(1)
   defer: sdl2.quit()
+
+  # Initialize GBA
+  let gba_emu = new_gba(bios_path, rom_path, run_bios)
+  gba_emu.post_init()
 
   let title = cstring("crab - " & gba_emu.cartridge.title())
   let window = createWindow(

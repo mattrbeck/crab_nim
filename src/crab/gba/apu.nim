@@ -8,6 +8,33 @@ const APU_SAMPLE_PERIOD*  = CPU_CLOCK_SPEED div APU_SAMPLE_RATE
 const FRAME_SEQ_RATE*     = 512
 const FRAME_SEQ_PERIOD*   = CPU_CLOCK_SPEED div FRAME_SEQ_RATE
 
+# Minimal SDL2 audio C bindings (SDL2 is already linked via nim.cfg)
+type
+  SDL_AudioDeviceID = uint32
+  SDL_AudioSpec = object
+    freq:      cint
+    format:    uint16
+    channels:  uint8
+    silence:   uint8
+    samples:   uint16
+    padding:   uint16
+    size:      uint32
+    callback:  pointer
+    userdata:  pointer
+
+const AUDIO_S16LSB = 0x8010'u16
+
+proc sdl_open_audio(desired: ptr SDL_AudioSpec; obtained: ptr SDL_AudioSpec): cint
+  {.importc: "SDL_OpenAudio", cdecl.}
+proc sdl_pause_audio(pause_on: cint)
+  {.importc: "SDL_PauseAudio", cdecl.}
+proc sdl_queue_audio(dev: SDL_AudioDeviceID; data: pointer; len: uint32): cint
+  {.importc: "SDL_QueueAudio", cdecl.}
+proc sdl_get_queued_audio_size(dev: SDL_AudioDeviceID): uint32
+  {.importc: "SDL_GetQueuedAudioSize", cdecl.}
+proc sdl_clear_queued_audio(dev: SDL_AudioDeviceID)
+  {.importc: "SDL_ClearQueuedAudio", cdecl.}
+
 proc new_apu*(gba: GBA): APU =
   result = APU(
     gba: gba,
@@ -26,7 +53,22 @@ proc new_apu*(gba: GBA): APU =
   result.channel3 = new_channel3(gba)
   result.channel4 = new_channel4(gba)
   result.dma_channels = new_dma_channels(gba)
-  # TODO: SDL audio setup
+  # Open SDL2 audio device (SDL2 must already be initialized by the frontend)
+  var desired = SDL_AudioSpec(
+    freq:     APU_SAMPLE_RATE.cint,
+    format:   AUDIO_S16LSB,
+    channels: APU_CHANNELS.uint8,
+    samples:  uint16(APU_BUFFER_SIZE div APU_CHANNELS),
+    callback: nil,
+    userdata: nil,
+  )
+  var obtained: SDL_AudioSpec
+  if sdl_open_audio(addr desired, addr obtained) == 0:
+    result.audio_dev = 1  # SDL_OpenAudio always uses device ID 1
+    sdl_pause_audio(0)    # unpause (start playback)
+  else:
+    echo "Warning: failed to open audio device"
+    result.audio_dev = 0
   result.tick_frame_sequencer()
   result.get_sample()
 
@@ -89,7 +131,16 @@ proc get_sample*(apu: APU) =
   apu.buffer[apu.buffer_pos + 1] = total_right * 32
   apu.buffer_pos += 2
   if apu.buffer_pos >= APU_BUFFER_SIZE:
-    # TODO: SDL audio queue
+    if apu.audio_dev != 0:
+      if not apu.sync:
+        sdl_clear_queued_audio(apu.audio_dev)
+      # Block until the queue drains to < 2 buffers to stay in sync
+      let threshold = uint32(APU_BUFFER_SIZE * sizeof(int16) * 2)
+      while sdl_get_queued_audio_size(apu.audio_dev) > threshold:
+        discard
+      discard sdl_queue_audio(apu.audio_dev,
+                               cast[pointer](addr apu.buffer[0]),
+                               uint32(APU_BUFFER_SIZE * sizeof(int16)))
     apu.buffer_pos = 0
   let g = apu.gba
   g.scheduler.schedule(APU_SAMPLE_PERIOD, proc() {.closure.} = apu.get_sample(), etAPU)

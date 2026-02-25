@@ -292,6 +292,7 @@ type
     channel4*:          Channel4
     dma_channels*:      DMAChannels
     sync*:              bool
+    audio_dev*:         uint32  # SDL2 AudioDeviceID (0 = not open)
 
   Cartridge* = ref object
     rom*: seq[byte]
