@@ -54,11 +54,51 @@
 - Added `audio_dev: uint32` field to `APU` type in `gba.nim` (`SDL_OpenAudio` always assigns device ID 1).
 - Moved `sdl2.init(INIT_VIDEO or INIT_AUDIO)` in `crab.nim` to before `new_gba()` — APU opens the audio device during construction.
 
+### Phase 3: ARM Instruction Set Correctness
+
+#### Fix: LSL by 32 (test 152 in gba-tests/arm)
+**Problem**: `word shl 32` for a `uint32` is undefined behavior in C/Nim. On x86, the hardware
+takes shift amount mod 32, so `1 shl 32 = 1` instead of 0. This caused `LSLS r0, r1` (r1=32)
+to produce result=1 (Z clear) instead of result=0 (Z set), failing the branch test.
+
+**Fix** (`src/crab/gba/cpu.nim` — `lsl` proc):
+Handle all shift-amount cases explicitly per ARM7TDMI spec:
+- `bits == 0`: return word unchanged
+- `bits < 32`: normal shift
+- `bits == 32`: result = 0, carry = bit 0 of source
+- `bits > 32`: result = 0, carry = 0
+
+Crystal didn't have this problem because Crystal's `<<` operator returns 0 for shifts ≥ type width.
+
+#### Fix: UMULL/SMULL RangeDefect (crash between tests 152 and 511)
+**Problem**: `multiply_long.nim` used `int64` for the result variable. The unsigned path computed
+`int64(uint64(rm) * uint64(rs))`, which throws `RangeDefect` at runtime when the product exceeds
+`int64.max` — since Nim debug builds check integer range on conversion.
+
+**Fix** (`src/crab/gba/arm/multiply_long.nim`):
+Changed `res` from `int64` to `uint64`, matching Crystal's `UInt64` type. The signed path uses
+`cast[uint64](int64_product)` (bitwise reinterpret, no range check). All arithmetic and
+`set_reg` calls now use pure `uint64` — no checked conversions.
+
+#### Fix: STM^ user-bank register access (test 511 in gba-tests/arm)
+**Problem**: Nim's `defer` is scoped to its **enclosing block**, not the enclosing proc. The
+`if s_bit:` block used `defer: cpu.switch_mode(saved_mode)`, which fired immediately when the
+`if` block ended — before the transfer loop. The STM then ran in the original (FIQ) mode,
+storing FIQ-banked r8 (64) instead of USR-banked r8 (32).
+
+**Fix** (`src/crab/gba/arm/block_data_transfer.nim`):
+Removed `defer`. Now matches Crystal exactly: save mode before `switch_mode(USR)`, run the
+transfer loop, then explicitly call `switch_mode(saved_mode)` after the loop (outside the
+`if` block).
+
+**Key lesson**: Never use `defer` inside an `if` block when the deferred work must outlive that
+block. Nim `defer` ≠ Go `defer` (which is proc-scoped).
+
 ## Current Status
 
 | Subsystem     | Status        | Notes                                            |
 |---------------|---------------|--------------------------------------------------|
-| CPU (ARM)     | Working       | All standard instructions implemented            |
+| CPU (ARM)     | Working       | All standard instructions; gba-tests/arm passes  |
 | CPU (Thumb)   | Working       | All standard instructions implemented            |
 | PPU           | Working       | Modes 0–5, sprites, windowing                    |
 | APU           | Working       | PSG channels 1–4 + DMA channels A/B; SDL2 output |
