@@ -166,7 +166,7 @@ bitfield BGREF, uint32:
   num not_used, 4, read_only = true
 
 proc num*(self: BGREF): int32 {.inline.} =
-  int32(self.value shl 4) shr 4
+  cast[int32](self.value shl 4) shr 4
 
 bitfield WINH, uint16:
   num x2, 8
