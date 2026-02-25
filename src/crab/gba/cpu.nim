@@ -65,6 +65,14 @@ proc irq*(cpu: CPU) =
     discard cpu.set_reg(14, lr)
     discard cpu.set_reg(15, 0x18'u32)
 
+proc und*(cpu: CPU) =
+  let lr = cpu.r[15] - 4'u32
+  cpu.switch_mode(modeUND)
+  cpu.cpsr.thumb = false
+  cpu.cpsr.irq_disable = true
+  discard cpu.set_reg(14, lr)
+  discard cpu.set_reg(15, 0x04'u32)
+
 proc fill_pipeline*(cpu: CPU) =
   if cpu.cpsr.thumb:
     let pc = cpu.r[15] and not 1'u32
@@ -129,7 +137,7 @@ proc check_cond*(cpu: CPU; cond: uint32): bool =
   of 0xC: not cpu.cpsr.zero and cpu.cpsr.negative == cpu.cpsr.overflow
   of 0xD: cpu.cpsr.zero or cpu.cpsr.negative != cpu.cpsr.overflow
   of 0xE: true
-  else: raise newException(Exception, "Cond 0xF is reserved")
+  else: false  # NV (never) - ARMv4T reserved, treated as no-op
 
 proc lsl*(cpu: CPU; word: uint32; bits: uint32; carry_out: ptr bool): uint32 =
   log("lsl - word:" & hex_str(word) & ", bits:" & $bits)

@@ -11,9 +11,10 @@ proc new_bus*(gba: GBA; bios_path: string): Bus =
   result.bios       = newSeq[byte](0x4000)
   result.wram_board = newSeq[byte](0x40000)
   result.wram_chip  = newSeq[byte](0x08000)
-  let f = open(bios_path, fmRead)
-  discard f.readBytes(result.bios, 0, result.bios.len)
-  f.close()
+  if bios_path != "":
+    let f = open(bios_path, fmRead)
+    discard f.readBytes(result.bios, 0, result.bios.len)
+    f.close()
   result.gpio = new_gpio(gba)
 
 proc bus_page(address: uint32): int {.inline.} =

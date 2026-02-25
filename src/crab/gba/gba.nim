@@ -317,6 +317,7 @@ type
 
 # Forward declarations to handle circular include dependencies
 proc irq*(cpu: CPU)
+proc und*(cpu: CPU)
 proc schedule_interrupt_check*(intr: Interrupts)
 proc read_open_bus_value*(bus: Bus; address: uint32): uint8
 proc `[]`*(bus: Bus; address: uint32): uint8

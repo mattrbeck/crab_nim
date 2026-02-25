@@ -9,10 +9,12 @@ proc arm_execute*(cpu: CPU; instr: uint32) =
     cpu.step_arm()
 
 proc arm_unimplemented*(cpu: CPU; instr: uint32) =
-  raise newException(Exception, "Unimplemented ARM instruction: " & hex_str(instr))
+  cpu.und()
+  cpu.step_arm()
 
 proc arm_unused*(cpu: CPU; instr: uint32) =
-  echo "Unused ARM instruction: ", hex_str(instr)
+  cpu.und()
+  cpu.step_arm()
 
 proc rotate_register*(cpu: CPU; instr: uint32; carry_out: ptr bool; allow_register_shifts: bool): uint32 =
   let reg        = int(bits_range(instr, 0, 3))
