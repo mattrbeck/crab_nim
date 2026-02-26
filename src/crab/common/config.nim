@@ -169,19 +169,25 @@ proc default_keybindings*(): Table[cint, Input] =
 
 type
   Config* = ref object
-    explorer_dir*:  string
-    keybindings*:   Table[cint, Input]
-    recents*:       seq[string]
-    run_bios*:      bool
-    bios_path*:     string   # "" = use built-in HLE BIOS
+    explorer_dir*:      string
+    keybindings*:       Table[cint, Input]
+    recents*:           seq[string]
+    run_bios*:          bool
+    bios_path*:         string   # GBA BIOS path
+    headless*:          bool
+    gb_bootrom_path*:   string   # GB/GBC boot ROM path
+    gb_fifo*:           bool     # use FIFO PPU renderer (default true)
 
 proc new_config*(): Config =
   Config(
-    explorer_dir:  getCurrentDir(),
-    keybindings:   default_keybindings(),
-    recents:       @[],
-    run_bios:      false,
-    bios_path:     "",
+    explorer_dir:    getCurrentDir(),
+    keybindings:     default_keybindings(),
+    recents:         @[],
+    run_bios:        false,
+    bios_path:       "",
+    headless:        false,
+    gb_bootrom_path: "",
+    gb_fifo:         true,
   )
 
 proc parse_config(j: JsonNode): Config =
@@ -198,6 +204,12 @@ proc parse_config(j: JsonNode): Config =
     let gba = j["gba"]
     if gba.hasKey("bios") and gba["bios"].kind == JString:
       cfg.bios_path = gba["bios"].getStr("")
+  if j.hasKey("gb") and j["gb"].kind == JObject:
+    let gb = j["gb"]
+    if gb.hasKey("bootrom") and gb["bootrom"].kind == JString:
+      cfg.gb_bootrom_path = gb["bootrom"].getStr("")
+    if gb.hasKey("fifo") and gb["fifo"].kind == JBool:
+      cfg.gb_fifo = gb["fifo"].getBool(true)
   if j.hasKey("keybindings") and j["keybindings"].kind == JObject:
     cfg.keybindings = initTable[cint, Input]()
     for k, v in j["keybindings"].pairs:

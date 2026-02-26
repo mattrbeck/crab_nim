@@ -1,9 +1,10 @@
-import std/[os, parseopt, strformat, tables, times]
+import std/[os, parseopt, strformat, strutils, tables, times]
 import sdl2 except init, quit, glBindTexture, glUnbindTexture
 import imguin/[cimgui, impl_opengl, impl_sdl2]
 import imguin/glad/gl
 import crab/common/config
 import crab/gba/gba
+import crab/gb/gb
 import crab/frontend/file_explorer
 import crab/frontend/config_editor
 import crab/frontend/keybindings_widget
@@ -12,6 +13,8 @@ import crab/frontend/gba_debug
 const VERSION = "0.1.0"
 const GBA_W   = 240
 const GBA_H   = 160
+const GB_W    = 160
+const GB_H    = 144
 
 # Mod key mask for keyboard shortcuts (raw int16 from modstate)
 when defined(macosx):
@@ -111,9 +114,13 @@ proc setup_vao() =
 
 # ──────────────────────────── App State ────────────────────────────
 
+type EmuKind = enum ekNone, ekGBA, ekGB
+
 type AppState = ref object
   cfg:             Config
   gba_emu:         GBA
+  gb_emu:          GB
+  emu_kind:        EmuKind
   window:          WindowPtr
   gl_ctx:          GlContextPtr
   io:              ptr ImGuiIO
@@ -135,9 +142,22 @@ var app: AppState
 proc load_rom(path: string) =
   if not fileExists(path):
     echo "ROM not found: ", path; return
-  let bios = app.cfg.bios_path
-  app.gba_emu = new_gba(bios, path, app.cfg.run_bios)
-  app.gba_emu.post_init()
+  let ext = path.splitFile().ext.toLowerAscii()
+  if ext in [".gb", ".gbc"]:
+    app.gb_emu = new_gb(app.cfg.gb_bootrom_path, path, app.cfg.gb_fifo,
+                        app.cfg.headless, app.cfg.run_bios)
+    app.gb_emu.post_init()
+    app.gba_emu = nil
+    app.emu_kind = ekGB
+    setSize(app.window, cint(GB_W * app.scale), cint(GB_H * app.scale))
+  else:
+    let bios = app.cfg.bios_path
+    app.gba_emu = new_gba(bios, path, app.cfg.run_bios)
+    app.gba_emu.post_init()
+    app.gb_emu = nil
+    app.emu_kind = ekGBA
+    setSize(app.window, cint(GBA_W * app.scale), cint(GBA_H * app.scale))
+    app.dbg = new_gba_debug(app.gba_emu)
   # Update recents
   var recs = app.cfg.recents
   let idx = recs.find(path)
@@ -146,20 +166,26 @@ proc load_rom(path: string) =
   while recs.len > 8: recs.setLen(8)
   app.cfg.recents = recs
   save_config(app.cfg)
-  # Resize window
-  setSize(app.window, cint(GBA_W * app.scale), cint(GBA_H * app.scale))
   setPosition(app.window, SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED)
-  app.dbg = new_gba_debug(app.gba_emu)
   app.paused = false
 
 # ──────────────────────────── Rendering ────────────────────────────
 
 proc render_game() =
-  if app.gba_emu == nil: return
   glBindTexture(GL_TEXTURE_2D, app.game_texture)
-  glTexImage2D(GL_TEXTURE_2D, 0, GLint(GL_RGB5), GBA_W, GBA_H, 0,
-               GL_RGBA, GL_UNSIGNED_SHORT_1_5_5_5_REV,
-               addr app.gba_emu.ppu.framebuffer[0])
+  case app.emu_kind
+  of ekGBA:
+    if app.gba_emu == nil: return
+    glTexImage2D(GL_TEXTURE_2D, 0, GLint(GL_RGB5), GBA_W, GBA_H, 0,
+                 GL_RGBA, GL_UNSIGNED_SHORT_1_5_5_5_REV,
+                 addr app.gba_emu.ppu.framebuffer[0])
+  of ekGB:
+    if app.gb_emu == nil: return
+    glTexImage2D(GL_TEXTURE_2D, 0, GLint(GL_RGB5), GB_W, GB_H, 0,
+                 GL_RGBA, GL_UNSIGNED_SHORT_1_5_5_5_REV,
+                 addr app.gb_emu.ppu.framebuffer[0])
+  of ekNone:
+    return
   glDrawArrays(GL_TRIANGLE_STRIP, 0, 4)
 
 proc show_menu_bar(): bool =
@@ -206,7 +232,7 @@ proc render_imgui() =
                                    nil, addr should_reset, true)
         discard igMenuItem_BoolPtr(cstring("Pause  " & MOD_KEY_STR & "+P"),
                                    nil, addr app.paused, true)
-        if app.gba_emu != nil:
+        if app.emu_kind == ekGBA and app.gba_emu != nil:
           discard igMenuItem_BoolPtr("Audio Sync", "Tab",
                                      addr app.gba_emu.apu.sync, true)
         if should_reset and app.cfg.recents.len > 0:
@@ -219,8 +245,10 @@ proc render_imgui() =
           for s in 1 .. 8:
             if igMenuItem_Bool(cstring($s & "x"), nil, s == app.scale, true):
               app.scale = s
-              if app.gba_emu != nil:
-                setSize(app.window, cint(GBA_W * s), cint(GBA_H * s))
+              case app.emu_kind
+              of ekGBA: setSize(app.window, cint(GBA_W * s), cint(GBA_H * s))
+              of ekGB:  setSize(app.window, cint(GB_W * s),  cint(GB_H * s))
+              of ekNone: discard
           igSeparator()
           if igMenuItem_BoolPtr(cstring("Fullscreen  " & MOD_KEY_STR & "+F"),
                                 nil, addr app.fullscreen, true):
@@ -243,7 +271,7 @@ proc render_imgui() =
       igEndMainMenuBar()
 
   # File explorer
-  app.fe.render("ROM", open_rom, ["gba"], proc(path: string) =
+  app.fe.render("ROM", open_rom, ["gba", "gb", "gbc"], proc(path: string) =
     load_rom(path))
 
   # Config editor
@@ -307,11 +335,16 @@ proc handle_input() =
           of K_q:
             app.running = false
           else: discard
-      elif app.gba_emu != nil:
+      elif app.emu_kind == ekGBA and app.gba_emu != nil:
         if app.cfg.keybindings.hasKey(sym):
           app.gba_emu.handle_input(app.cfg.keybindings[sym], pressed)
         elif sym == K_TAB and pressed:
           app.gba_emu.apu.sync = not app.gba_emu.apu.sync
+      elif app.emu_kind == ekGB and app.gb_emu != nil:
+        if app.cfg.keybindings.hasKey(sym):
+          app.gb_emu.handle_input(app.cfg.keybindings[sym], pressed)
+        elif sym == K_TAB and pressed:
+          app.gb_emu.apu.toggle_sync()
 
     of WindowEvent:
       let wev = window(evt)
@@ -343,7 +376,7 @@ proc update_fps_title() =
   let cur_sec = now.toUnix() mod 60
   if cur_sec != fps_second:
     let fps = if fps_us > 0: fps_frames.float * 1_000_000.0 / fps_us.float else: 0.0
-    let title = if app.gba_emu == nil: "crab"
+    let title = if app.emu_kind == ekNone: "crab"
                 elif app.paused: "crab - PAUSED"
                 else: fmt"crab - {fps:.1f} fps"
     setTitle(app.window, cstring(title))
@@ -467,8 +500,13 @@ proc main() =
     load_rom(rom_path)
 
   while app.running:
-    if app.gba_emu != nil and not app.paused:
-      app.gba_emu.run_until_frame()
+    if not app.paused:
+      case app.emu_kind
+      of ekGBA:
+        if app.gba_emu != nil: app.gba_emu.run_until_frame()
+      of ekGB:
+        if app.gb_emu != nil: app.gb_emu.run_until_frame()
+      of ekNone: discard
     handle_input()
     glClear(GL_COLOR_BUFFER_BIT)
     render_game()
