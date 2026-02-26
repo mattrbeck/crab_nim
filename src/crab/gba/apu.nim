@@ -36,6 +36,8 @@ proc sdl_get_queued_audio_size(dev: SDL_AudioDeviceID): uint32
   {.importc: "SDL_GetQueuedAudioSize", cdecl.}
 proc sdl_clear_queued_audio(dev: SDL_AudioDeviceID)
   {.importc: "SDL_ClearQueuedAudio", cdecl.}
+proc sdl_delay(ms: uint32)
+  {.importc: "SDL_Delay", cdecl.}
 
 proc new_apu*(gba: GBA): APU =
   result = APU(
@@ -140,7 +142,7 @@ proc get_sample*(apu: APU) =
       # Block until the queue drains to < 2 buffers to stay in sync
       let threshold = uint32(APU_BUFFER_SIZE * sizeof(int16) * 2)
       while sdl_get_queued_audio_size(apu.audio_dev) > threshold:
-        discard
+        sdl_delay(1)
       discard sdl_queue_audio(apu.audio_dev,
                                cast[pointer](addr apu.buffer[0]),
                                uint32(APU_BUFFER_SIZE * sizeof(int16)))
