@@ -2,6 +2,7 @@ import std/[os, parseopt, strformat, strutils, tables, times]
 import sdl2 except init, quit, glBindTexture, glUnbindTexture
 import imguin/[cimgui, impl_opengl, impl_sdl2]
 import imguin/glad/gl
+import stb_image/read as stbi
 import crab/common/config
 import crab/gba/gba
 import crab/gb/gb
@@ -23,6 +24,8 @@ when defined(macosx):
 else:
   const MOD_KEY_MASK = int16(0x00C0)  # LCTRL | RCTRL
   const MOD_KEY_STR  = "Ctrl"
+
+const CRAB_PNG_DATA = staticRead("../reference/crab/README/crab.png")
 
 # ──────────────────────────── Shaders ────────────────────────────
 
@@ -51,6 +54,27 @@ void main() {
   220.0 * color.b +  10.0 * color.g +  50.0 * color.r) / 255.0,
     vec3(1.0 / outGamma));
 }
+"""
+
+const LOGO_VERT_SRC = """
+#version 330 core
+out vec2 tex_coord;
+uniform float aspect;
+uniform float scale;
+const vec2 vertices[4] = vec2[](vec2(-1.0,-1.0),vec2(1.0,-1.0),vec2(-1.0,1.0),vec2(1.0,1.0));
+void main() {
+  vec2 scaled_xy = vec2(vertices[gl_VertexID]) * scale;
+  gl_Position = vec4(scaled_xy.x, scaled_xy.y * aspect, 0.0, 1.0);
+  tex_coord = (vertices[gl_VertexID] + 1.0) / vec2(2.0, -2.0);
+}
+"""
+
+const LOGO_FRAG_SRC = """
+#version 330 core
+in vec2 tex_coord;
+out vec4 frag_color;
+uniform sampler2D input_texture;
+void main() { frag_color = texture(input_texture, tex_coord); }
 """
 
 # ──────────────────────────── Helpers ────────────────────────────
@@ -100,12 +124,48 @@ proc create_shader_program(): GLuint =
   glDeleteShader(vert)
   glDeleteShader(frag)
 
+proc create_logo_shader_program(): GLuint =
+  let vert = compile_shader(LOGO_VERT_SRC, GL_VERTEX_SHADER)
+  let frag = compile_shader(LOGO_FRAG_SRC, GL_FRAGMENT_SHADER)
+  result = glCreateProgram()
+  glAttachShader(result, vert)
+  glAttachShader(result, frag)
+  glLinkProgram(result)
+  var status: GLint = 0
+  glGetProgramiv(result, GL_LINK_STATUS, addr status)
+  if status == 0:
+    var log_len: GLint = 0
+    glGetProgramiv(result, GL_INFO_LOG_LENGTH, addr log_len)
+    var log_buf = newString(log_len + 1)
+    glGetProgramInfoLog(result, log_len, nil, cstring(log_buf))
+    echo "Logo shader link error: ", log_buf
+    sdl2.quit(); system.quit(1)
+  glDeleteShader(vert)
+  glDeleteShader(frag)
+
 proc setup_game_texture(): GLuint =
   glGenTextures(1, addr result)
   glActiveTexture(GL_TEXTURE0)
   glBindTexture(GL_TEXTURE_2D, result)
   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GLint(GL_NEAREST))
   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GLint(GL_NEAREST))
+
+proc load_crab_texture(): (GLuint, float32) =
+  var buf = newSeq[byte](CRAB_PNG_DATA.len)
+  for i, c in CRAB_PNG_DATA: buf[i] = byte(c)
+  var w, h, comp: int
+  let pixels = stbi.loadFromMemory(buf, w, h, comp, stbi.RGBA)
+  var tex: GLuint
+  glGenTextures(1, addr tex)
+  glActiveTexture(GL_TEXTURE0)
+  glBindTexture(GL_TEXTURE_2D, tex)
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GLint(GL_LINEAR))
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GLint(GL_LINEAR))
+  glTexImage2D(GL_TEXTURE_2D, 0, GLint(GL_RGBA), GLsizei(w), GLsizei(h), 0,
+               GL_RGBA, GL_UNSIGNED_BYTE,
+               unsafeAddr pixels[0])
+  let canvas_aspect = float32(h) / float32(w)
+  result = (tex, canvas_aspect)
 
 proc setup_vao() =
   var vao: GLuint
@@ -125,6 +185,10 @@ type AppState = ref object
   gl_ctx:          GlContextPtr
   io:              ptr ImGuiIO
   game_texture:    GLuint
+  crab_texture:    GLuint
+  canvas_aspect:   float32
+  logo_shader:     GLuint
+  game_shader:     GLuint
   fe:              FileExplorer
   ce:              ConfigEditor
   dbg:             GbaDebug
@@ -158,6 +222,9 @@ proc load_rom(path: string) =
     app.emu_kind = ekGBA
     setSize(app.window, cint(GBA_W * app.scale), cint(GBA_H * app.scale))
     app.dbg = new_gba_debug(app.gba_emu)
+  glDisable(GL_BLEND)
+  glUseProgram(app.game_shader)
+  glBindTexture(GL_TEXTURE_2D, app.game_texture)
   # Update recents
   var recs = app.cfg.recents
   let idx = recs.find(path)
@@ -171,24 +238,36 @@ proc load_rom(path: string) =
 
 # ──────────────────────────── Rendering ────────────────────────────
 
+proc render_logo() =
+  glBindTexture(GL_TEXTURE_2D, app.crab_texture)
+  var w, h: cint
+  getSize(app.window, w, h)
+  let window_aspect = float32(w) / float32(h)
+  let aspect_loc = glGetUniformLocation(app.logo_shader, "aspect")
+  let scale_loc  = glGetUniformLocation(app.logo_shader, "scale")
+  glUniform1f(aspect_loc, window_aspect * app.canvas_aspect)
+  glUniform1f(scale_loc, 0.5'f32)
+  glDrawArrays(GL_TRIANGLE_STRIP, 0, 4)
+
 proc render_game() =
-  glBindTexture(GL_TEXTURE_2D, app.game_texture)
   case app.emu_kind
   of ekGBA:
     if app.gba_emu == nil: return
     glTexImage2D(GL_TEXTURE_2D, 0, GLint(GL_RGB5), GBA_W, GBA_H, 0,
                  GL_RGBA, GL_UNSIGNED_SHORT_1_5_5_5_REV,
                  addr app.gba_emu.ppu.framebuffer[0])
+    glDrawArrays(GL_TRIANGLE_STRIP, 0, 4)
   of ekGB:
     if app.gb_emu == nil: return
     glTexImage2D(GL_TEXTURE_2D, 0, GLint(GL_RGB5), GB_W, GB_H, 0,
                  GL_RGBA, GL_UNSIGNED_SHORT_1_5_5_5_REV,
                  addr app.gb_emu.ppu.framebuffer[0])
+    glDrawArrays(GL_TRIANGLE_STRIP, 0, 4)
   of ekNone:
-    return
-  glDrawArrays(GL_TRIANGLE_STRIP, 0, 4)
+    render_logo()
 
 proc show_menu_bar(): bool =
+  if app.emu_kind == ekNone: return true
   let focused    = getMouseFocus() == app.window
   let mouse_idle = getTicks() - app.last_mouse_tick > 3000'u32
   result = focused and not mouse_idle
@@ -461,8 +540,12 @@ proc main() =
   glClearColor(60.0'f32/255, 61.0'f32/255, 107.0'f32/255, 1.0'f32)
   let game_tex = setup_game_texture()
   setup_vao()
-  let shader_prog = create_shader_program()
-  glUseProgram(shader_prog)
+  let game_shader = create_shader_program()
+  let logo_shader = create_logo_shader_program()
+  let (crab_tex, canvas_aspect) = load_crab_texture()
+  glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
+  glEnable(GL_BLEND)
+  glUseProgram(logo_shader)
 
   # ImGui setup
   discard igCreateContext(nil)
@@ -483,6 +566,10 @@ proc main() =
     gl_ctx:          gl_ctx,
     io:              io_ptr,
     game_texture:    game_tex,
+    crab_texture:    crab_tex,
+    canvas_aspect:   canvas_aspect,
+    logo_shader:     logo_shader,
+    game_shader:     game_shader,
     fe:              fe,
     ce:              ce,
     dbg:             nil,
