@@ -269,4 +269,10 @@ proc save_config*(cfg: Config) =
     lines.add("  bios: " & yaml_str(cfg.bios_path))
   else:
     lines.add("  bios:")
+  lines.add("gb:")
+  if cfg.gb_bootrom_path.len > 0:
+    lines.add("  bootrom: " & yaml_str(cfg.gb_bootrom_path))
+  else:
+    lines.add("  bootrom:")
+  lines.add("  fifo: " & $cfg.gb_fifo)
   writeFile(path, lines.join("\n") & "\n")
