@@ -92,20 +92,18 @@ proc parse_wl_instr*(kind: WLInstrKind; instr: uint16): Option[WLParsed] =
     none(WLParsed)
 
 proc analyze_loop*(cpu: CPU; start_addr: uint32; end_addr: uint32) =
+  defer: cpu.branch_dest = start_addr
   if not cpu.attempt_waitloop_detection: return
   if start_addr != cpu.branch_dest: return
   if not (start_addr < end_addr and
           (end_addr - start_addr) >= 2 and
           (end_addr - start_addr) <= 8):
-    cpu.branch_dest = start_addr
     return
   if cpu.cache_waitloop_results:
     if start_addr in cpu.identified_waitloops:
       cpu.entered_waitloop = true
-      cpu.branch_dest = start_addr
       return
     if start_addr in cpu.identified_non_waitloops:
-      cpu.branch_dest = start_addr
       return
   var written_bits: uint16 = 0
   var never_write: uint16  = 0
@@ -117,23 +115,19 @@ proc analyze_loop*(cpu: CPU; start_addr: uint32; end_addr: uint32) =
     if parsed.isNone or not parsed.get.read_only:
       if cpu.cache_waitloop_results:
         cpu.identified_non_waitloops.add(start_addr)
-      cpu.branch_dest = start_addr
       return
     let p = parsed.get
     never_write = never_write or (p.read_bits and not written_bits)
     if (written_bits and never_write) > 0:
       if cpu.cache_waitloop_results:
         cpu.identified_non_waitloops.add(start_addr)
-      cpu.branch_dest = start_addr
       return
     if (p.write_bits and (1'u16 shl 15)) > 0:
       if cpu.cache_waitloop_results:
         cpu.identified_non_waitloops.add(start_addr)
-      cpu.branch_dest = start_addr
       return
     written_bits = written_bits or p.write_bits
     cur_addr += 2
   if cpu.cache_waitloop_results:
     cpu.identified_waitloops.add(start_addr)
   cpu.entered_waitloop = true
-  cpu.branch_dest = start_addr
