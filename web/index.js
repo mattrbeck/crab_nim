@@ -64,6 +64,15 @@ document.getElementById("open-rom").addEventListener("click", () => {
 var Module = {
   canvas: (() => document.getElementById("canvas"))(),
   onRuntimeInitialized: () => {
+    let frameCount = 0;
+    const realTick = Module._loop_tick.bind(Module);
+    Module._loop_tick = () => { realTick(); frameCount++; };
+
+    setInterval(() => {
+      document.getElementById("fps").textContent = frameCount + " fps";
+      frameCount = 0;
+    }, 1000);
+
     const tick = () => {
       Module._loop_tick();
       requestAnimationFrame(tick);
