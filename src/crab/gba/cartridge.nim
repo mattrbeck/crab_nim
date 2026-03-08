@@ -11,7 +11,6 @@ proc new_cartridge*(rom_path: string): Cartridge =
   let f = open(rom_path, fmRead)
   discard f.readBytes(result.rom, 0, result.rom.len)
   f.close()
-  # Handle improperly-dumped ROMs (non-power-of-two sizes).
   let sz = getFileSize(rom_path)
   if count_set_bits(sz) != 1:
     let last_bit = last_set_bit(sz)

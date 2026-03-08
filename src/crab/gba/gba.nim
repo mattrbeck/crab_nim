@@ -455,11 +455,13 @@ proc handle_saves*(gba: GBA) =
   gba.scheduler.schedule(280896, proc() {.closure.} = gba.handle_saves(), etSaves)
   gba.storage.write_save()
 
-method run_until_frame*(gba: GBA) =
+proc step_frame*(gba: GBA) =
   gba.cpu.count_cycles = 0
   while not gba.ppu.frame:
     gba.cpu.tick()
   gba.ppu.frame = false
+
+method run_until_frame*(gba: GBA) = gba.step_frame()
 
 proc handle_input*(gba: GBA; input: Input; pressed: bool) =
   gba.keypad.handle_input(input, pressed)

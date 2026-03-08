@@ -12,3 +12,14 @@ imgui.ini
 
 # Nim compiler cache
 .cache/
+
+# WASM build artifacts and test ROMs
+web/em.js
+web/em.wasm
+web/bios.bin
+web/rom.gba
+web/rom.gb
+web/rom.gbc
+
+# Native binary (root-level only)
+/crab

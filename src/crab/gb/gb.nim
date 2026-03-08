@@ -504,10 +504,12 @@ proc post_init*(gb: GB) =
   if gb.bootrom_path.len == 0 or not gb.run_bios:
     gb_skip_boot(gb)
 
-method run_until_frame*(gb: GB) =
+proc step_frame*(gb: GB) =
   while not gb.ppu.frame:
     gb.cpu.tick(gb)
   gb.ppu.frame = false
+
+method run_until_frame*(gb: GB) = gb.step_frame()
 
 method handle_input*(gb: GB; inp: Input; pressed: bool) {.base.} =
   gb.joypad.handle_input(inp, pressed)
