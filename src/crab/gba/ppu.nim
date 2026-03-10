@@ -406,16 +406,17 @@ proc `[]`*(ppu: PPU; io_addr: uint32): uint8 =
   of 0x002..0x003: 0'u8  # green swap
   of 0x004..0x005: read(ppu.dispstat, io_addr and 1)
   of 0x006..0x007: read(ppu.vcount, io_addr and 1)
-  of 0x008..0x00F:
-    let bg_num = int((io_addr - 0x008) shr 1)
-    var val = read(ppu.bgcnt[bg_num], io_addr and 1)
-    if (io_addr == 0xD or io_addr == 0xF) and ppu.bgcnt[bg_num].affine_wrap:
-      val = val or 0x20'u8
-    val
-  of 0x048..0x049: read(ppu.winin, io_addr and 1)
-  of 0x04A..0x04B: read(ppu.winout, io_addr and 1)
-  of 0x050..0x051: read(ppu.bldcnt, io_addr and 1)
-  of 0x052..0x053: read(ppu.bldalpha, io_addr and 1)
+  of 0x008, 0x00A, 0x00C, 0x00E:  # BGxCNT low byte
+    read(ppu.bgcnt[int((io_addr - 0x008) shr 1)], 0)
+  of 0x009, 0x00B:  # BG0/BG1 CNT high byte — bit 13 (affine_wrap) not readable
+    read(ppu.bgcnt[int((io_addr - 0x008) shr 1)], 1) and 0xDF'u8
+  of 0x00D, 0x00F:  # BG2/BG3 CNT high byte
+    read(ppu.bgcnt[int((io_addr - 0x008) shr 1)], 1)
+  of 0x048..0x049: read(ppu.winin, io_addr and 1) and 0x3F'u8
+  of 0x04A..0x04B: read(ppu.winout, io_addr and 1) and 0x3F'u8
+  of 0x050: read(ppu.bldcnt, 0)
+  of 0x051: read(ppu.bldcnt, 1) and 0x3F'u8  # bits 14-15 not readable
+  of 0x052..0x053: read(ppu.bldalpha, io_addr and 1) and 0x1F'u8
   else: ppu.gba.bus.read_open_bus_value(io_addr)
 
 proc `[]=`*(ppu: PPU; io_addr: uint32; value: uint8) =

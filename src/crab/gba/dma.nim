@@ -29,11 +29,10 @@ proc `[]`*(dma: DMA; io_addr: uint32): uint8 =
   let reg     = int((io_addr - 0xB0'u32) mod 12)
   case reg
   of 8, 9: 0'u8  # dmacnt_l is write-only
-  of 10, 11:
-    var val = read(dma.dmacnt_h[channel], io_addr and 1)
-    if io_addr == 0xDF'u32 and dma.dmacnt_h[3].game_pak:
-      val = val or 0b1000'u8
-    val
+  of 10: read(dma.dmacnt_h[channel], 0) and 0xE0'u8  # bits 0-4 not readable
+  of 11:  # game_pak (bit 11) not readable for DMA0-2
+    let mask = if channel < 3: 0xF7'u8 else: 0xFF'u8
+    read(dma.dmacnt_h[channel], 1) and mask
   else: dma.gba.bus.read_open_bus_value(io_addr)
 
 proc `[]=`*(dma: DMA; io_addr: uint32; value: uint8) =
