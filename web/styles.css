@@ -361,6 +361,18 @@ body {
   opacity: 1;
 }
 
+.modal-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 16px;
+}
+
+#storage-info {
+  opacity: 0.5;
+  font-size: 12px;
+}
+
 #recent-list:empty::after {
   content: "No recent ROMs";
   display: block;

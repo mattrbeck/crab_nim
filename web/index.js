@@ -12,7 +12,95 @@ const log = (message) => {
   if (shouldScroll) logDiv.scroll({ top: logDiv.scrollHeight });
 };
 
-// --- BIOS/Bootrom storage helpers ---
+// --- IndexedDB storage ---
+
+const DB_NAME = "crab";
+const DB_VERSION = 1;
+let db = null;
+
+const openDB = () => new Promise((resolve, reject) => {
+  let req = indexedDB.open(DB_NAME, DB_VERSION);
+  req.onupgradeneeded = () => {
+    let d = req.result;
+    if (!d.objectStoreNames.contains("blobs")) d.createObjectStore("blobs");
+  };
+  req.onsuccess = () => { db = req.result; resolve(db); };
+  req.onerror = () => reject(req.error);
+});
+
+const dbGet = (key) => new Promise((resolve, reject) => {
+  let tx = db.transaction("blobs", "readonly");
+  let req = tx.objectStore("blobs").get(key);
+  req.onsuccess = () => resolve(req.result ?? null);
+  req.onerror = () => reject(req.error);
+});
+
+const dbPut = (key, value) => new Promise((resolve, reject) => {
+  let tx = db.transaction("blobs", "readwrite");
+  let req = tx.objectStore("blobs").put(value, key);
+  req.onsuccess = () => resolve();
+  req.onerror = () => reject(req.error);
+});
+
+const dbDelete = (key) => new Promise((resolve, reject) => {
+  let tx = db.transaction("blobs", "readwrite");
+  let req = tx.objectStore("blobs").delete(key);
+  req.onsuccess = () => resolve();
+  req.onerror = () => reject(req.error);
+});
+
+// Migrate localStorage data to IndexedDB on first run
+const migrateFromLocalStorage = async () => {
+  const decodeBase64 = (b64) => {
+    let binary = atob(b64);
+    let bytes = new Uint8Array(binary.length);
+    for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+    return bytes;
+  };
+
+  // Migrate GBA BIOS
+  let gbaBios = localStorage.getItem("crab_bios");
+  if (gbaBios) {
+    let name = localStorage.getItem("crab_bios_name") || null;
+    await dbPut("bios:gba", { name, data: decodeBase64(gbaBios) });
+    localStorage.removeItem("crab_bios");
+    localStorage.removeItem("crab_bios_name");
+  }
+
+  // Migrate GBC bootrom
+  let gbcBootrom = localStorage.getItem("crab_gbc_bootrom");
+  if (gbcBootrom) {
+    let name = localStorage.getItem("crab_gbc_bootrom_name") || null;
+    await dbPut("bios:gbc", { name, data: decodeBase64(gbcBootrom) });
+    localStorage.removeItem("crab_gbc_bootrom");
+    localStorage.removeItem("crab_gbc_bootrom_name");
+  }
+
+  // Migrate recent ROMs
+  let recentRaw = localStorage.getItem("crab_recent_roms");
+  if (recentRaw) {
+    try {
+      let list = JSON.parse(recentRaw);
+      let migrated = list.map(r => ({ name: r.name, data: decodeBase64(r.data) }));
+      await dbPut("recent", migrated);
+    } catch {}
+    localStorage.removeItem("crab_recent_roms");
+  }
+
+  // Migrate saves
+  let savesRaw = localStorage.getItem("crab_saves");
+  if (savesRaw) {
+    try {
+      let saves = JSON.parse(savesRaw);
+      for (let [key, b64] of Object.entries(saves)) {
+        await dbPut("save:" + key, decodeBase64(b64));
+      }
+    } catch {}
+    localStorage.removeItem("crab_saves");
+  }
+};
+
+// --- FS / BIOS helpers ---
 
 const writeToFS = (filename, bytes) => {
   let stream = FS.open(filename, "w+");
@@ -20,25 +108,11 @@ const writeToFS = (filename, bytes) => {
   FS.close(stream);
 };
 
-const saveToStorage = (key, bytes) => {
-  let binary = "";
-  for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i]);
-  localStorage.setItem(key, btoa(binary));
-};
-
-const loadFromStorage = (key, filename) => {
-  let data = localStorage.getItem(key);
-  if (!data) return false;
-  let binary = atob(data);
-  let bytes = new Uint8Array(binary.length);
-  for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
-  writeToFS(filename, bytes);
-  return true;
-};
-
-const loadBiosFromStorage = () => {
-  loadFromStorage("crab_bios", "bios.bin");
-  loadFromStorage("crab_gbc_bootrom", "bootrom.bin");
+const loadBiosFromStorage = async () => {
+  let gba = await dbGet("bios:gba");
+  if (gba) writeToFS("bios.bin", gba.data);
+  let gbc = await dbGet("bios:gbc");
+  if (gbc) writeToFS("bootrom.bin", gbc.data);
 };
 
 // --- Menu ---
@@ -65,16 +139,14 @@ const gbcBootromStatus = document.getElementById("gbc-bootrom-status");
 let pendingGbaBios = null;
 let pendingGbcBootrom = null;
 
-const getStoredBiosName = (key) => localStorage.getItem(key + "_name") || null;
-
-const updateBiosStatusText = () => {
+const updateBiosStatusText = async () => {
   if (pendingGbaBios === "remove") {
     gbaBiosStatus.textContent = "Default (pending)";
   } else if (pendingGbaBios) {
     gbaBiosStatus.textContent = pendingGbaBios.name + " (pending)";
   } else {
-    let name = getStoredBiosName("crab_bios");
-    gbaBiosStatus.textContent = name || (localStorage.getItem("crab_bios") ? "Set" : "Not set");
+    let stored = await dbGet("bios:gba");
+    gbaBiosStatus.textContent = stored?.name || (stored ? "Set" : "Not set");
   }
 
   if (pendingGbcBootrom === "remove") {
@@ -82,8 +154,8 @@ const updateBiosStatusText = () => {
   } else if (pendingGbcBootrom) {
     gbcBootromStatus.textContent = pendingGbcBootrom.name + " (pending)";
   } else {
-    let name = getStoredBiosName("crab_gbc_bootrom");
-    gbcBootromStatus.textContent = name || (localStorage.getItem("crab_gbc_bootrom") ? "Set" : "Not set");
+    let stored = await dbGet("bios:gbc");
+    gbcBootromStatus.textContent = stored?.name || (stored ? "Set" : "Not set");
   }
 };
 
@@ -140,24 +212,20 @@ const closeBiosModal = () => {
   biosModal.classList.remove("open");
 };
 
-document.getElementById("bios-save").addEventListener("click", () => {
+document.getElementById("bios-save").addEventListener("click", async () => {
   if (pendingGbaBios === "remove") {
-    localStorage.removeItem("crab_bios");
-    localStorage.removeItem("crab_bios_name");
+    await dbDelete("bios:gba");
     try { FS.unlink("bios.bin"); } catch {}
   } else if (pendingGbaBios) {
     writeToFS("bios.bin", pendingGbaBios.bytes);
-    saveToStorage("crab_bios", pendingGbaBios.bytes);
-    localStorage.setItem("crab_bios_name", pendingGbaBios.name);
+    await dbPut("bios:gba", { name: pendingGbaBios.name, data: pendingGbaBios.bytes });
   }
   if (pendingGbcBootrom === "remove") {
-    localStorage.removeItem("crab_gbc_bootrom");
-    localStorage.removeItem("crab_gbc_bootrom_name");
+    await dbDelete("bios:gbc");
     try { FS.unlink("bootrom.bin"); } catch {}
   } else if (pendingGbcBootrom) {
     writeToFS("bootrom.bin", pendingGbcBootrom.bytes);
-    saveToStorage("crab_gbc_bootrom", pendingGbcBootrom.bytes);
-    localStorage.setItem("crab_gbc_bootrom_name", pendingGbcBootrom.name);
+    await dbPut("bios:gbc", { name: pendingGbcBootrom.name, data: pendingGbcBootrom.bytes });
   }
   closeBiosModal();
 });
@@ -170,34 +238,46 @@ biosModal.addEventListener("click", (e) => {
 
 // --- Recent ROMs ---
 
-const RECENT_KEY = "crab_recent_roms";
 const MAX_RECENT = 20;
 
-const getRecentRoms = () => {
-  try { return JSON.parse(localStorage.getItem(RECENT_KEY)) || []; }
-  catch { return []; }
+const getRecentRoms = async () => {
+  return (await dbGet("recent")) || [];
 };
 
-const saveRecentRoms = (list) => {
-  localStorage.setItem(RECENT_KEY, JSON.stringify(list));
+const saveRecentRoms = async (list) => {
+  await dbPut("recent", list);
 };
 
-const addRecentRom = (name, bytes) => {
-  let binary = "";
-  for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i]);
-  let encoded = btoa(binary);
-  let list = getRecentRoms().filter(r => r.name !== name);
-  list.unshift({ name, data: encoded });
+const addRecentRom = async (name, bytes) => {
+  let list = (await getRecentRoms()).filter(r => r.name !== name);
+  list.unshift({ name, data: new Uint8Array(bytes) });
   if (list.length > MAX_RECENT) list.length = MAX_RECENT;
-  saveRecentRoms(list);
+  await saveRecentRoms(list);
 };
 
 const recentModal = document.getElementById("recent-modal");
 const recentList = document.getElementById("recent-list");
+const storageInfo = document.getElementById("storage-info");
 
-const renderRecentList = () => {
+const formatBytes = (bytes) => {
+  if (bytes < 1024) return bytes + " B";
+  if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + " KB";
+  if (bytes < 1024 * 1024 * 1024) return (bytes / (1024 * 1024)).toFixed(1) + " MB";
+  return (bytes / (1024 * 1024 * 1024)).toFixed(1) + " GB";
+};
+
+const updateStorageInfo = async () => {
+  if (!navigator.storage?.estimate) {
+    storageInfo.textContent = "";
+    return;
+  }
+  let est = await navigator.storage.estimate();
+  storageInfo.textContent = `Storage: ${formatBytes(est.usage)} / ${formatBytes(est.quota)}`;
+};
+
+const renderRecentList = async () => {
   recentList.innerHTML = "";
-  let roms = getRecentRoms();
+  let roms = await getRecentRoms();
   for (let rom of roms) {
     let entry = document.createElement("div");
     entry.className = "recent-entry";
@@ -205,12 +285,9 @@ const renderRecentList = () => {
     nameSpan.className = "recent-entry-name";
     nameSpan.textContent = rom.name;
     nameSpan.addEventListener("click", () => {
-      let binary = atob(rom.data);
-      let bytes = new Uint8Array(binary.length);
-      for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
       let ext = rom.name.substring(rom.name.lastIndexOf(".")).toLowerCase();
       let romFile = "rom" + ext;
-      writeToFS(romFile, bytes);
+      writeToFS(romFile, rom.data);
       recentModal.classList.remove("open");
       loadRom(romFile, rom.name);
     });
@@ -218,11 +295,12 @@ const renderRecentList = () => {
     delBtn.className = "recent-delete";
     delBtn.innerHTML = "&#x1f5d1;";
     delBtn.title = "Remove";
-    delBtn.addEventListener("click", (e) => {
+    delBtn.addEventListener("click", async (e) => {
       e.stopPropagation();
-      let list = getRecentRoms().filter(r => r.name !== rom.name);
-      saveRecentRoms(list);
-      renderRecentList();
+      let list = (await getRecentRoms()).filter(r => r.name !== rom.name);
+      await saveRecentRoms(list);
+      await renderRecentList();
+      updateStorageInfo();
     });
     entry.appendChild(nameSpan);
     entry.appendChild(delBtn);
@@ -233,6 +311,7 @@ const renderRecentList = () => {
 document.getElementById("open-recent").addEventListener("click", () => {
   menuDropdown.hidden = true;
   renderRecentList();
+  updateStorageInfo();
   recentModal.classList.add("open");
 });
 
@@ -256,40 +335,21 @@ document.addEventListener("keydown", (e) => {
 
 // --- Save state persistence ---
 
-const SAVES_KEY = "crab_saves";
-
-const getSaves = () => {
-  try { return JSON.parse(localStorage.getItem(SAVES_KEY)) || {}; }
-  catch { return {}; }
-};
-
-const saveSavesToStorage = (saves) => {
-  localStorage.setItem(SAVES_KEY, JSON.stringify(saves));
-};
-
-const persistSave = (romName, originalName) => {
+const persistSave = async (romName, originalName) => {
   let savName = romName.substring(0, romName.lastIndexOf(".")) + ".sav";
   try {
     let data = FS.readFile(savName);
     if (data && data.length > 0) {
-      let binary = "";
-      for (let i = 0; i < data.length; i++) binary += String.fromCharCode(data[i]);
-      let saves = getSaves();
-      saves[originalName] = btoa(binary);
-      saveSavesToStorage(saves);
+      await dbPut("save:" + originalName, new Uint8Array(data));
     }
   } catch {}
 };
 
-const restoreSave = (romName, originalName) => {
-  let saves = getSaves();
-  let encoded = saves[originalName];
-  if (!encoded) return;
+const restoreSave = async (romName, originalName) => {
+  let data = await dbGet("save:" + originalName);
+  if (!data) return;
   let savName = romName.substring(0, romName.lastIndexOf(".")) + ".sav";
-  let binary = atob(encoded);
-  let bytes = new Uint8Array(binary.length);
-  for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
-  writeToFS(savName, bytes);
+  writeToFS(savName, data);
 };
 
 var currentRomName = null;
@@ -302,10 +362,10 @@ const resetButton = document.getElementById("reset");
 const fastForwardButton = document.getElementById("fast-forward");
 const playbackControls = document.getElementById("playback-controls");
 
-const loadRom = (romName, originalName) => {
+const loadRom = async (romName, originalName) => {
   // Persist save from previous ROM before switching
   if (currentRomName && currentOriginalName) {
-    persistSave(currentRomName, currentOriginalName);
+    await persistSave(currentRomName, currentOriginalName);
   }
   currentRomName = romName;
   currentOriginalName = originalName || romName;
@@ -316,7 +376,7 @@ const loadRom = (romName, originalName) => {
   fastForwardButton.classList.remove("active");
   playbackControls.hidden = false;
   // Restore save for the new ROM
-  restoreSave(romName, currentOriginalName);
+  await restoreSave(romName, currentOriginalName);
   Module.ccall("initFromEmscripten", null, ["string"], [romName]);
 };
 
@@ -331,10 +391,10 @@ document.getElementById("open-rom").addEventListener("click", () => {
       let ext = file.name.substring(file.name.lastIndexOf(".")).toLowerCase();
       let romName = "rom" + ext;
       let reader = new FileReader();
-      reader.addEventListener("load", () => {
+      reader.addEventListener("load", async () => {
         let bytes = new Uint8Array(reader.result);
         writeToFS(romName, bytes);
-        addRecentRom(file.name, bytes);
+        await addRecentRom(file.name, bytes);
         loadRom(romName, file.name);
       });
       reader.readAsArrayBuffer(file);
@@ -360,8 +420,10 @@ fastForwardButton.addEventListener("click", () => {
 
 var Module = {
   canvas: (() => document.getElementById("canvas"))(),
-  onRuntimeInitialized: () => {
-    loadBiosFromStorage();
+  onRuntimeInitialized: async () => {
+    await openDB();
+    await migrateFromLocalStorage();
+    await loadBiosFromStorage();
     let frameCount = 0;
     const SAMPLE_RATE = 32768; // GBA/GB native sample rate
     const TARGET_FPS = 59.7275;
@@ -423,7 +485,7 @@ var Module = {
       frameCount = 0;
     }, 1000);
 
-    // Persist save data to localStorage every 5 seconds
+    // Persist save data to IndexedDB every 5 seconds
     setInterval(() => {
       if (currentRomName && currentOriginalName) {
         persistSave(currentRomName, currentOriginalName);
