@@ -54,16 +54,21 @@ document.getElementById("open-bios").addEventListener("click", () => {
 
 var currentRomName = null;
 var paused = false;
+var fastForward = false;
 
 const pauseButton = document.getElementById("pause");
 const resetButton = document.getElementById("reset");
+const fastForwardButton = document.getElementById("fast-forward");
 
 const loadRom = (romName) => {
   currentRomName = romName;
   paused = false;
+  fastForward = false;
   pauseButton.textContent = "Pause";
+  fastForwardButton.textContent = "Fast Forward";
   pauseButton.hidden = false;
   resetButton.hidden = false;
+  fastForwardButton.hidden = false;
   Module.ccall("initFromEmscripten", null, ["string"], [romName]);
 };
 
@@ -97,6 +102,11 @@ pauseButton.addEventListener("click", () => {
 
 resetButton.addEventListener("click", () => {
   if (currentRomName) loadRom(currentRomName);
+});
+
+fastForwardButton.addEventListener("click", () => {
+  fastForward = !fastForward;
+  fastForwardButton.textContent = fastForward ? "Normal Speed" : "Fast Forward";
 });
 
 var Module = {
@@ -174,17 +184,29 @@ var Module = {
       if (lastFrameTime === 0) lastFrameTime = timestamp;
       accumulator += timestamp - lastFrameTime;
       lastFrameTime = timestamp;
-      // Run as many frames as needed to catch up, capped to avoid spiral
-      let framesRun = 0;
-      while (accumulator >= FRAME_TIME && framesRun < 2) {
-        Module._loop_tick();
-        pushAudio();
-        frameCount++;
-        accumulator -= FRAME_TIME;
-        framesRun++;
+      if (fastForward) {
+        // Run as many frames as possible within ~16ms budget
+        const budget = 16;
+        const start = performance.now();
+        while (performance.now() - start < budget) {
+          Module._loop_tick();
+          Module._clearAudioBuffer();
+          frameCount++;
+        }
+        accumulator = 0;
+      } else {
+        // Run as many frames as needed to catch up, capped to avoid spiral
+        let framesRun = 0;
+        while (accumulator >= FRAME_TIME && framesRun < 2) {
+          Module._loop_tick();
+          pushAudio();
+          frameCount++;
+          accumulator -= FRAME_TIME;
+          framesRun++;
+        }
+        // Prevent accumulator from growing unbounded if tab was backgrounded
+        if (accumulator > FRAME_TIME * 2) accumulator = 0;
       }
-      // Prevent accumulator from growing unbounded if tab was backgrounded
-      if (accumulator > FRAME_TIME * 2) accumulator = 0;
       requestAnimationFrame(tick);
     };
     requestAnimationFrame(tick);
