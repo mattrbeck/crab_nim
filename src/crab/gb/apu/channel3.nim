@@ -12,7 +12,7 @@ proc ch3_step*(ch: GbChannel3; gb: GB) =
   ch.wave_ram_position = (ch.wave_ram_position + 1) mod 32
   ch.wave_ram_sample_buffer = ch.wave_ram[ch.wave_ram_position div 2]
   gb.scheduler.schedule_gb(int(ch3_frequency_timer(ch)),
-    proc() = ch3_step(ch, gb), etAPUChannel3)
+    etAPUChannel3)
 
 proc ch3_get_amplitude*(ch: GbChannel3): float32 =
   if ch.enabled and ch.dac_enabled:
@@ -69,7 +69,7 @@ proc ch3_write*(ch: GbChannel3; idx: int; val: uint8; gb: GB) =
           dec ch.length_counter
       gb.scheduler.clear(etAPUChannel3)
       gb.scheduler.schedule_gb(int(ch3_frequency_timer(ch)) + 6,
-        proc() = ch3_step(ch, gb), etAPUChannel3)
+        etAPUChannel3)
       ch.wave_ram_position = 0
   of 0xFF30..0xFF3F:
     if ch.enabled: ch.wave_ram[ch.wave_ram_position div 2] = val

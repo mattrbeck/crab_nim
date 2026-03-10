@@ -12,14 +12,6 @@ proc dma_addr_delta(ctrl: int; word_size: int): int =
   of 1:   -word_size    # Decrement
   else:    0            # Fixed
 
-proc make_dma_irq_flag(gba: GBA; num: int): proc() {.closure.} =
-  case num
-  of 0: result = proc() {.closure.} = gba.interrupts.reg_if.dma0 = true
-  of 1: result = proc() {.closure.} = gba.interrupts.reg_if.dma1 = true
-  of 2: result = proc() {.closure.} = gba.interrupts.reg_if.dma2 = true
-  of 3: result = proc() {.closure.} = gba.interrupts.reg_if.dma3 = true
-  else: result = proc() {.closure.} = discard
-
 proc new_dma*(gba: GBA): DMA =
   result = DMA(gba: gba)
   for i in 0..3:
@@ -29,7 +21,6 @@ proc new_dma*(gba: GBA): DMA =
     result.dmacnt_h[i] = DMACNT()
     result.src[i]     = 0
     result.dst[i]     = 0
-    result.interrupt_flags[i] = make_dma_irq_flag(gba, i)
 
 proc trigger*(dma: DMA; channel: int)
 
@@ -128,5 +119,10 @@ proc trigger*(dma: DMA; channel: int) =
     dma.dmacnt_h[channel].enable = false
 
   if dma.dmacnt_h[channel].irq_enable:
-    dma.interrupt_flags[channel]()
+    case channel
+    of 0: dma.gba.interrupts.reg_if.dma0 = true
+    of 1: dma.gba.interrupts.reg_if.dma1 = true
+    of 2: dma.gba.interrupts.reg_if.dma2 = true
+    of 3: dma.gba.interrupts.reg_if.dma3 = true
+    else: discard
     dma.gba.interrupts.schedule_interrupt_check()

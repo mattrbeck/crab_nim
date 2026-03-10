@@ -14,7 +14,7 @@ proc ch4_step*(ch: GbChannel4; gb: GB) =
     ch.lfsr = ch.lfsr and not (1'u16 shl 6)
     ch.lfsr = ch.lfsr or (new_bit shl 6)
   gb.scheduler.schedule_gb(int(ch4_frequency_timer(ch)),
-    proc() = ch4_step(ch, gb), etAPUChannel4)
+    etAPUChannel4)
 
 proc ch4_get_amplitude*(ch: GbChannel4): float32 =
   if ch.enabled and ch.dac_enabled:
@@ -55,7 +55,7 @@ proc ch4_write*(ch: GbChannel4; idx: int; val: uint8; gb: GB) =
           dec ch.length_counter
       gb.scheduler.clear(etAPUChannel4)
       gb.scheduler.schedule_gb(int(ch4_frequency_timer(ch)),
-        proc() = ch4_step(ch, gb), etAPUChannel4)
+        etAPUChannel4)
       init_volume_envelope(ch)
       ch.lfsr = 0x7FFF'u16
   else: discard

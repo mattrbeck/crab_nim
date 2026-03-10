@@ -52,12 +52,10 @@ proc bitmap*(ppu: PPU): bool =
   ppu.dispcnt.bg_mode >= 3
 
 proc start_line*(ppu: PPU) =
-  let g = ppu.gba
-  g.scheduler.schedule(960, proc() {.closure.} = ppu.start_hblank(), etPPU)
+  ppu.gba.scheduler.schedule(960, etPPUStartHBlank)
 
 proc start_hblank*(ppu: PPU) =
-  let g = ppu.gba
-  g.scheduler.schedule(272, proc() {.closure.} = ppu.end_hblank(), etPPU)
+  ppu.gba.scheduler.schedule(272, etPPUEndHBlank)
   ppu.dispstat.hblank = true
   if ppu.dispstat.hblank_irq_enable:
     ppu.gba.interrupts.reg_if.hblank = true
@@ -67,11 +65,10 @@ proc start_hblank*(ppu: PPU) =
     for bg_num in 0..1:
       ppu.bgref_int[bg_num][0] += ppu.bgaff[bg_num][1].num  # bgx += dmx
       ppu.bgref_int[bg_num][1] += ppu.bgaff[bg_num][3].num  # bgy += dmy
-    g.dma.trigger_hdma()
+    ppu.gba.dma.trigger_hdma()
 
 proc end_hblank*(ppu: PPU) =
-  let g = ppu.gba
-  g.scheduler.schedule(0, proc() {.closure.} = ppu.start_line(), etPPU)
+  ppu.gba.scheduler.schedule(0, etPPUStartLine)
   ppu.dispstat.hblank = false
   ppu.vcount = uint16((int(ppu.vcount) + 1) mod 228)
   ppu.dispstat.vcounter = (ppu.vcount == uint16(ppu.dispstat.vcount_setting))
@@ -81,14 +78,14 @@ proc end_hblank*(ppu: PPU) =
     ppu.dispstat.vblank = false
   elif ppu.vcount == 160:
     ppu.dispstat.vblank = true
-    g.dma.trigger_vdma()
+    ppu.gba.dma.trigger_vdma()
     if ppu.dispstat.vblank_irq_enable:
       ppu.gba.interrupts.reg_if.vblank = true
     for bg_num in 0..1:
       for ref_num in 0..1:
         ppu.bgref_int[bg_num][ref_num] = ppu.bgref[bg_num][ref_num].num
     ppu.draw()
-  g.interrupts.schedule_interrupt_check()
+  ppu.gba.interrupts.schedule_interrupt_check()
 
 proc draw*(ppu: PPU) =
   ppu.frame = true

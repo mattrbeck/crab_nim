@@ -33,7 +33,7 @@ proc ch2_frequency_timer*(ch: Channel2): uint32 =
 proc ch2_step*(ch: Channel2) =
   ch.ch2_step_wave()
   let ft = ch.ch2_frequency_timer()
-  ch.gba.scheduler.schedule(int(ft), proc() {.closure.} = ch.ch2_step(), etAPUChannel2)
+  ch.gba.scheduler.schedule(int(ft), etAPUChannel2)
 
 proc ch2_get_amplitude*(ch: Channel2): int16 =
   if ch.enabled and ch.dac_enabled:
@@ -72,7 +72,7 @@ proc ch2_write*(ch: Channel2; address: uint32; value: uint8) =
           ch.length_counter -= 1
       ch.gba.scheduler.clear(etAPUChannel2)
       let ft = ch.ch2_frequency_timer()
-      ch.gba.scheduler.schedule(int(ft), proc() {.closure.} = ch.ch2_step(), etAPUChannel2)
+      ch.gba.scheduler.schedule(int(ft), etAPUChannel2)
       ch.init_volume_envelope()
   of 0x6E, 0x6F: discard
   else: echo "Writing to invalid Channel2 register: ", hex_str(uint16(address))

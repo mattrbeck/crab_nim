@@ -6,17 +6,18 @@ else:
 type
   EventType* = enum
     # Shared
-    etAPU, etAPUChannel1, etAPUChannel2, etAPUChannel3, etAPUChannel4
+    etAPUFrameSeq, etAPUSample
+    etAPUChannel1, etAPUChannel2, etAPUChannel3, etAPUChannel4
     etHandleInput
     # GB
     etIME
     # GBA
-    etSaves, etInterrupts, etPPU
+    etSaves, etInterrupts
+    etPPUStartLine, etPPUStartHBlank, etPPUEndHBlank
     etTimer0, etTimer1, etTimer2, etTimer3
 
   Event* = object
     cycles*: CycleCount
-    cb: proc() {.closure.}
     kind*: EventType
 
   Scheduler* = ref object
@@ -24,15 +25,16 @@ type
     cycles*: CycleCount
     next_event: CycleCount
     current_speed: uint8
+    dispatch*: proc(kind: EventType) {.closure.}
 
 proc new_scheduler*(): Scheduler =
   result = Scheduler(next_event: high(CycleCount))
   result.events = @[]
 
-proc schedule*(s: Scheduler; cycles: int; cb: proc() {.closure.}; kind: EventType) =
+proc schedule*(s: Scheduler; cycles: int; kind: EventType) =
   # Insert in sorted order by target cycle.
   let target = s.cycles + CycleCount(cycles)
-  let ev = Event(cycles: target, cb: cb, kind: kind)
+  let ev = Event(cycles: target, kind: kind)
   var idx = s.events.len
   for i in 0 ..< s.events.len:
     if s.events[i].cycles > target:
@@ -41,11 +43,11 @@ proc schedule*(s: Scheduler; cycles: int; cb: proc() {.closure.}; kind: EventTyp
   s.events.insert(ev, idx)
   s.next_event = s.events[0].cycles
 
-proc schedule_gb*(s: Scheduler; cycles: int; cb: proc() {.closure.}; kind: EventType) =
+proc schedule_gb*(s: Scheduler; cycles: int; kind: EventType) =
   var c = cycles
   if kind != etIME:
     c = c shl s.current_speed
-  s.schedule(c, cb, kind)
+  s.schedule(c, kind)
 
 proc clear*(s: Scheduler; kind: EventType) =
   # Remove all events of a given type.
@@ -64,8 +66,8 @@ proc call_current*(s: Scheduler) =
       return
     let ev = s.events[0]
     if s.cycles >= ev.cycles:
-      ev.cb()
       s.events.delete(0)
+      s.dispatch(ev.kind)
     else:
       s.next_event = ev.cycles
       return

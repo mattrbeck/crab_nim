@@ -16,8 +16,7 @@ proc ch1_frequency_timer(ch: GbChannel1): uint32 =
 
 proc ch1_step*(ch: GbChannel1; gb: GB) =
   ch.wave_duty_position = (ch.wave_duty_position + 1) and 7
-  gb.scheduler.schedule_gb(int(ch1_frequency_timer(ch)),
-    proc() = ch1_step(ch, gb), etAPUChannel1)
+  gb.scheduler.schedule_gb(int(ch1_frequency_timer(ch)), etAPUChannel1)
 
 proc ch1_frequency_calc(ch: GbChannel1): uint16 =
   let shifted = ch.frequency_shadow shr ch.shift
@@ -82,7 +81,7 @@ proc ch1_write*(ch: GbChannel1; idx: int; val: uint8; gb: GB) =
           dec ch.length_counter
       gb.scheduler.clear(etAPUChannel1)
       gb.scheduler.schedule_gb(int(ch1_frequency_timer(ch)),
-        proc() = ch1_step(ch, gb), etAPUChannel1)
+        etAPUChannel1)
       init_volume_envelope(ch)
       ch.frequency_shadow = ch.frequency
       ch.sweep_timer      = if ch.sweep_period > 0: ch.sweep_period else: 8'u8

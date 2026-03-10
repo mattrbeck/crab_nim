@@ -42,7 +42,7 @@ proc ch3_frequency_timer*(ch: Channel3): uint32 =
 proc ch3_step*(ch: Channel3) =
   ch.ch3_step_wave()
   let ft = ch.ch3_frequency_timer()
-  ch.gba.scheduler.schedule(int(ft), proc() {.closure.} = ch.ch3_step(), etAPUChannel3)
+  ch.gba.scheduler.schedule(int(ft), etAPUChannel3)
 
 const CH3_VOLUME_TABLE = [0, 4, 2, 1]
 
@@ -99,7 +99,7 @@ proc ch3_write*(ch: Channel3; address: uint32; value: uint8) =
           ch.length_counter -= 1
       ch.gba.scheduler.clear(etAPUChannel3)
       let ft = ch.ch3_frequency_timer() + 6
-      ch.gba.scheduler.schedule(int(ft), proc() {.closure.} = ch.ch3_step(), etAPUChannel3)
+      ch.gba.scheduler.schedule(int(ft), etAPUChannel3)
       ch.wave_ram_position = 0
   of 0x76, 0x77: discard
   of WAVE_RAM_LOW..WAVE_RAM_HIGH:

@@ -80,8 +80,6 @@ type
     tmd*:          array[4, uint16]
     tm*:           array[4, uint16]
     cycle_enabled*: array[4, CycleCount]
-    events*:       array[4, proc() {.closure.}]
-    interrupt_flags*: array[4, proc() {.closure.}]
 
   DmaStartTiming* = enum
     dmaImmediate = 0, dmaVBlank = 1, dmaHBlank = 2, dmaSpecial = 3
@@ -97,8 +95,6 @@ type
     dst*:       array[4, uint32]
     dmacnt_l*:  array[4, uint16]
     dmacnt_h*:  array[4, DMACNT]
-    interrupt_flags*: array[4, proc() {.closure.}]
-
   RtcState* = enum
     rtcWaiting, rtcCommand, rtcReading, rtcWriting
 
@@ -440,6 +436,26 @@ proc new_gba*(bios_path, rom_path: string; run_bios: bool): GBA =
 
 proc handle_saves*(gba: GBA)
 
+proc gba_dispatch(gba: GBA): proc(kind: EventType) {.closure.} =
+  result = proc(kind: EventType) =
+    case kind
+    of etAPUFrameSeq:   gba.apu.tick_frame_sequencer()
+    of etAPUSample:     gba.apu.get_sample()
+    of etAPUChannel1:   gba.apu.channel1.ch1_step()
+    of etAPUChannel2:   gba.apu.channel2.ch2_step()
+    of etAPUChannel3:   gba.apu.channel3.ch3_step()
+    of etAPUChannel4:   gba.apu.channel4.ch4_step()
+    of etPPUStartLine:  gba.ppu.start_line()
+    of etPPUStartHBlank: gba.ppu.start_hblank()
+    of etPPUEndHBlank:  gba.ppu.end_hblank()
+    of etSaves:         gba.handle_saves()
+    of etInterrupts:    gba.interrupts.check_interrupts()
+    of etTimer0:        gba.timer.timer_overflow_event(0)
+    of etTimer1:        gba.timer.timer_overflow_event(1)
+    of etTimer2:        gba.timer.timer_overflow_event(2)
+    of etTimer3:        gba.timer.timer_overflow_event(3)
+    of etHandleInput, etIME: discard
+
 proc post_init*(gba: GBA) =
   gba.storage    = new_storage(gba, gba.rom_path)
   gba.mmio       = new_mmio(gba)
@@ -451,12 +467,13 @@ proc post_init*(gba: GBA) =
   gba.ppu        = new_ppu(gba)
   gba.apu        = new_apu(gba)
   gba.dma        = new_dma(gba)
+  gba.scheduler.dispatch = gba_dispatch(gba)
   gba.handle_saves()
   if not gba.run_bios:
     gba.cpu.skip_bios()
 
 proc handle_saves*(gba: GBA) =
-  gba.scheduler.schedule(280896, proc() {.closure.} = gba.handle_saves(), etSaves)
+  gba.scheduler.schedule(280896, etSaves)
   gba.storage.write_save()
 
 proc step_frame*(gba: GBA) =

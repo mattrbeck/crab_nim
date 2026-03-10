@@ -59,8 +59,7 @@ proc tick_frame_sequencer*(apu: GbApu; gb: GB) =
   else: discard
   apu.frame_sequencer_stage += 1
   if apu.frame_sequencer_stage > 7: apu.frame_sequencer_stage = 0
-  gb.scheduler.schedule_gb(GB_FRAME_SEQ_PERIOD,
-    proc() = tick_frame_sequencer(apu, gb), etAPU)
+  gb.scheduler.schedule_gb(GB_FRAME_SEQ_PERIOD, etAPUFrameSeq)
 
 proc get_sample*(apu: GbApu; gb: GB) =
   let c1 = ch1_get_amplitude(apu.channel1)
@@ -93,8 +92,7 @@ proc get_sample*(apu: GbApu; gb: GB) =
         discard sdl_queue_audio_gb(apu.audio_dev,
           addr apu.buffer[0], uint32(GB_APU_BUFFER_SIZE * 4))
       apu.buffer_pos = 0
-  gb.scheduler.schedule_gb(GB_SAMPLE_PERIOD,
-    proc() = get_sample(apu, gb), etAPU)
+  gb.scheduler.schedule_gb(GB_SAMPLE_PERIOD, etAPUSample)
 
 proc new_gb_apu*(gb: GB; headless: bool): GbApu =
   result = GbApu(

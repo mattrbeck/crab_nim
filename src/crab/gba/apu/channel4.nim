@@ -32,7 +32,7 @@ proc ch4_frequency_timer*(ch: Channel4): uint32 =
 proc ch4_step*(ch: Channel4) =
   ch.ch4_step_wave()
   let ft = ch.ch4_frequency_timer()
-  ch.gba.scheduler.schedule(int(ft), proc() {.closure.} = ch.ch4_step(), etAPUChannel4)
+  ch.gba.scheduler.schedule(int(ft), etAPUChannel4)
 
 proc ch4_get_amplitude*(ch: Channel4): int16 =
   if ch.enabled and ch.dac_enabled:
@@ -72,7 +72,7 @@ proc ch4_write*(ch: Channel4; address: uint32; value: uint8) =
           ch.length_counter -= 1
       ch.gba.scheduler.clear(etAPUChannel4)
       let ft = ch.ch4_frequency_timer()
-      ch.gba.scheduler.schedule(int(ft), proc() {.closure.} = ch.ch4_step(), etAPUChannel4)
+      ch.gba.scheduler.schedule(int(ft), etAPUChannel4)
       ch.init_volume_envelope()
       ch.lfsr = 0x7FFF'u16
   of 0x7E, 0x7F: discard

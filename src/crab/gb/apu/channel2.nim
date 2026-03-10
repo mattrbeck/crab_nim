@@ -16,7 +16,7 @@ proc ch2_frequency_timer(ch: GbChannel2): uint32 =
 proc ch2_step*(ch: GbChannel2; gb: GB) =
   ch.wave_duty_position = (ch.wave_duty_position + 1) and 7
   gb.scheduler.schedule_gb(int(ch2_frequency_timer(ch)),
-    proc() = ch2_step(ch, gb), etAPUChannel2)
+    etAPUChannel2)
 
 proc ch2_get_amplitude*(ch: GbChannel2): float32 =
   if ch.enabled and ch.dac_enabled:
@@ -57,6 +57,6 @@ proc ch2_write*(ch: GbChannel2; idx: int; val: uint8; gb: GB) =
           dec ch.length_counter
       gb.scheduler.clear(etAPUChannel2)
       gb.scheduler.schedule_gb(int(ch2_frequency_timer(ch)),
-        proc() = ch2_step(ch, gb), etAPUChannel2)
+        etAPUChannel2)
       init_volume_envelope(ch)
   else: discard

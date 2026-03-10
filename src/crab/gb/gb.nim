@@ -493,6 +493,18 @@ proc gb_skip_boot(gb: GB) =
   gb.ppu.skip_boot()
   gb.timer.skip_boot()
 
+proc gb_dispatch(gb: GB): proc(kind: EventType) {.closure.} =
+  result = proc(kind: EventType) =
+    case kind
+    of etAPUFrameSeq:  tick_frame_sequencer(gb.apu, gb)
+    of etAPUSample:    get_sample(gb.apu, gb)
+    of etAPUChannel1:  ch1_step(gb.apu.channel1, gb)
+    of etAPUChannel2:  ch2_step(gb.apu.channel2, gb)
+    of etAPUChannel3:  ch3_step(gb.apu.channel3, gb)
+    of etAPUChannel4:  ch4_step(gb.apu.channel4, gb)
+    of etIME:          gb.cpu.ime = true
+    else: discard
+
 proc post_init*(gb: GB) =
   gb.scheduler  = new_scheduler()
   gb.interrupts = new_gb_interrupts()
@@ -505,6 +517,7 @@ proc post_init*(gb: GB) =
   gb.timer  = new_gb_timer()
   gb.memory = new_gb_memory(gb)
   gb.cpu    = new_gb_cpu()
+  gb.scheduler.dispatch = gb_dispatch(gb)
   if gb.bootrom_path.len == 0 or not gb.run_bios:
     gb_skip_boot(gb)
 

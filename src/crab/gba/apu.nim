@@ -128,8 +128,7 @@ proc tick_frame_sequencer*(apu: APU) =
   else: discard
   apu.frame_sequencer_stage += 1
   if apu.frame_sequencer_stage > 7: apu.frame_sequencer_stage = 0
-  let g = apu.gba
-  g.scheduler.schedule(FRAME_SEQ_PERIOD, proc() {.closure.} = apu.tick_frame_sequencer(), etAPU)
+  apu.gba.scheduler.schedule(FRAME_SEQ_PERIOD, etAPUFrameSeq)
 
 proc get_sample*(apu: APU) =
   if apu.soundcnt_h.sound_volume >= 3:
@@ -169,8 +168,7 @@ proc get_sample*(apu: APU) =
                                  cast[pointer](addr apu.buffer[0]),
                                  uint32(APU_BUFFER_SIZE * sizeof(int16)))
       apu.buffer_pos = 0
-  let g = apu.gba
-  g.scheduler.schedule(APU_SAMPLE_PERIOD, proc() {.closure.} = apu.get_sample(), etAPU)
+  apu.gba.scheduler.schedule(APU_SAMPLE_PERIOD, etAPUSample)
 
 proc `[]`*(apu: APU; io_addr: uint32): uint8 =
   if ch1_in_range(io_addr):      apu.channel1.ch1_read(io_addr)

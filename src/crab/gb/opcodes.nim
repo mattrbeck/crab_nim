@@ -1445,7 +1445,7 @@ var UNPREFIXED* = [
   proc(cpu: GbCpu; gb: GB): int =
     cpu_inc_pc(cpu)
     let c = cpu
-    gb.scheduler.schedule_gb(4, proc() = (c.ime = true), etIME)
+    gb.scheduler.schedule_gb(4, etIME)
     4,
 
   # 0xFC UNUSED

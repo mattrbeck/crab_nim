@@ -2,34 +2,30 @@
 
 const
   TIMER_PERIODS   = [1, 64, 256, 1024]
-  TIMER_EVENT_TYPES = [etTimer0, etTimer1, etTimer2, etTimer3]
-
-proc make_timer_irq_flag(gba: GBA; num: int): proc() {.closure.} =
-  case num
-  of 0: result = proc() {.closure.} = gba.interrupts.reg_if.timer0 = true
-  of 1: result = proc() {.closure.} = gba.interrupts.reg_if.timer1 = true
-  of 2: result = proc() {.closure.} = gba.interrupts.reg_if.timer2 = true
-  of 3: result = proc() {.closure.} = gba.interrupts.reg_if.timer3 = true
-  else: result = proc() {.closure.} = discard
+  TIMER_EVENT_TYPES* = [etTimer0, etTimer1, etTimer2, etTimer3]
 
 proc cycles_until_overflow(tim: Timer; num: int): int =
   TIMER_PERIODS[tim.tmcnt[num].frequency] * (0x10000 - int(tim.tm[num]))
 
-proc make_overflow_event(tim: Timer; num: int): proc() {.closure.} =
-  result = proc() {.closure.} =
-    tim.tm[num] = tim.tmd[num]
-    tim.cycle_enabled[num] = tim.gba.scheduler.cycles
-    if num < 3 and tim.tmcnt[num + 1].cascade and tim.tmcnt[num + 1].enable:
-      tim.tm[num + 1] += 1
-      if tim.tm[num + 1] == 0:
-        tim.events[num + 1]()
-    if num <= 1:
-      tim.gba.apu.timer_overflow(num)
-    if tim.tmcnt[num].irq_enable:
-      tim.interrupt_flags[num]()
-      tim.gba.interrupts.schedule_interrupt_check()
-    if not tim.tmcnt[num].cascade:
-      tim.gba.scheduler.schedule(tim.cycles_until_overflow(num), tim.events[num], TIMER_EVENT_TYPES[num])
+proc timer_overflow_event*(tim: Timer; num: int) =
+  tim.tm[num] = tim.tmd[num]
+  tim.cycle_enabled[num] = tim.gba.scheduler.cycles
+  if num < 3 and tim.tmcnt[num + 1].cascade and tim.tmcnt[num + 1].enable:
+    tim.tm[num + 1] += 1
+    if tim.tm[num + 1] == 0:
+      tim.timer_overflow_event(num + 1)
+  if num <= 1:
+    tim.gba.apu.timer_overflow(num)
+  if tim.tmcnt[num].irq_enable:
+    case num
+    of 0: tim.gba.interrupts.reg_if.timer0 = true
+    of 1: tim.gba.interrupts.reg_if.timer1 = true
+    of 2: tim.gba.interrupts.reg_if.timer2 = true
+    of 3: tim.gba.interrupts.reg_if.timer3 = true
+    else: discard
+    tim.gba.interrupts.schedule_interrupt_check()
+  if not tim.tmcnt[num].cascade:
+    tim.gba.scheduler.schedule(tim.cycles_until_overflow(num), TIMER_EVENT_TYPES[num])
 
 proc new_timer*(gba: GBA): Timer =
   result = Timer(gba: gba)
@@ -38,11 +34,6 @@ proc new_timer*(gba: GBA): Timer =
     result.tmd[i] = 0
     result.tm[i] = 0
     result.cycle_enabled[i] = 0
-  for i in 0..3:
-    result.interrupt_flags[i] = make_timer_irq_flag(gba, i)
-  # events must be set after result is fully initialized, since they capture result
-  for i in 0..3:
-    result.events[i] = make_overflow_event(result, i)
 
 proc get_current_tm(tim: Timer; num: int): uint16 =
   if tim.tmcnt[num].enable and not tim.tmcnt[num].cascade:
@@ -77,7 +68,7 @@ proc `[]=`*(tim: Timer; io_addr: uint32; value: uint8) =
           tim.cycle_enabled[num] = tim.gba.scheduler.cycles
           if not was_enabled:
             tim.tm[num] = tim.tmd[num]
-          tim.gba.scheduler.schedule(tim.cycles_until_overflow(num), tim.events[num], TIMER_EVENT_TYPES[num])
+          tim.gba.scheduler.schedule(tim.cycles_until_overflow(num), TIMER_EVENT_TYPES[num])
       elif was_enabled:
         tim.gba.scheduler.clear(TIMER_EVENT_TYPES[num])
   else:

@@ -7,13 +7,13 @@ proc new_interrupts*(gba: GBA): Interrupts =
   result.ime = false
 
 proc schedule_interrupt_check*(intr: Interrupts) =
-  let g = intr.gba
-  g.scheduler.schedule(0, proc() {.closure.} =
-    if (uint16(intr.reg_ie) and uint16(intr.reg_if)) != 0:
-      g.cpu.halted = false
-      if intr.ime:
-        g.cpu.irq()
-  , etInterrupts)
+  intr.gba.scheduler.schedule(0, etInterrupts)
+
+proc check_interrupts*(intr: Interrupts) =
+  if (uint16(intr.reg_ie) and uint16(intr.reg_if)) != 0:
+    intr.gba.cpu.halted = false
+    if intr.ime:
+      intr.gba.cpu.irq()
 
 proc `[]`*(intr: Interrupts; io_addr: uint32): uint8 =
   case io_addr
