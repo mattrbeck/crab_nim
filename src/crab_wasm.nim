@@ -103,7 +103,8 @@ proc initFromEmscripten(rom_path: cstring) {.exportc.} =
     stateTexture = nil
   if ext in [".gb", ".gbc"]:
     stateKind = ekGB
-    stateGb = new_gb("", path, true, false, false)
+    let bootrom = if fileExists("bootrom.bin"): "bootrom.bin" else: ""
+    stateGb = new_gb(bootrom, path, true, false, bootrom.len > 0)
     stateGb.post_init()
     stateTexture = stateRenderer.createTexture(
       SDL_PIXELFORMAT_BGR555, SDL_TEXTUREACCESS_STREAMING, GB_W, GB_H)

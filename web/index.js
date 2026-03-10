@@ -12,44 +12,164 @@ const log = (message) => {
   if (shouldScroll) logDiv.scroll({ top: logDiv.scrollHeight });
 };
 
-const writeBiosToFS = (bytes) => {
-  let stream = FS.open("bios.bin", "w+");
+// --- BIOS/Bootrom storage helpers ---
+
+const writeToFS = (filename, bytes) => {
+  let stream = FS.open(filename, "w+");
   FS.write(stream, bytes, 0, bytes.length, 0);
   FS.close(stream);
 };
 
-const saveBiosToStorage = (bytes) => {
+const saveToStorage = (key, bytes) => {
   let binary = "";
   for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i]);
-  localStorage.setItem("crab_bios", btoa(binary));
+  localStorage.setItem(key, btoa(binary));
 };
 
-const loadBiosFromStorage = () => {
-  let data = localStorage.getItem("crab_bios");
+const loadFromStorage = (key, filename) => {
+  let data = localStorage.getItem(key);
   if (!data) return false;
   let binary = atob(data);
   let bytes = new Uint8Array(binary.length);
   for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
-  writeBiosToFS(bytes);
+  writeToFS(filename, bytes);
   return true;
 };
 
-document.getElementById("open-bios").addEventListener("click", () => {
+const loadBiosFromStorage = () => {
+  loadFromStorage("crab_bios", "bios.bin");
+  loadFromStorage("crab_gbc_bootrom", "bootrom.bin");
+};
+
+// --- Menu ---
+
+const menuBtn = document.getElementById("menu-btn");
+const menuDropdown = document.getElementById("menu-dropdown");
+
+menuBtn.addEventListener("click", (e) => {
+  e.stopPropagation();
+  menuDropdown.hidden = !menuDropdown.hidden;
+});
+
+document.addEventListener("click", () => {
+  menuDropdown.hidden = true;
+});
+
+// --- BIOS Modal ---
+
+const biosModal = document.getElementById("bios-modal");
+const gbaBiosStatus = document.getElementById("gba-bios-status");
+const gbcBootromStatus = document.getElementById("gbc-bootrom-status");
+
+// Pending state: { bytes, name } for a new pick, "remove" for removal, or null for no change
+let pendingGbaBios = null;
+let pendingGbcBootrom = null;
+
+const getStoredBiosName = (key) => localStorage.getItem(key + "_name") || null;
+
+const updateBiosStatusText = () => {
+  if (pendingGbaBios === "remove") {
+    gbaBiosStatus.textContent = "Default (pending)";
+  } else if (pendingGbaBios) {
+    gbaBiosStatus.textContent = pendingGbaBios.name + " (pending)";
+  } else {
+    let name = getStoredBiosName("crab_bios");
+    gbaBiosStatus.textContent = name || (localStorage.getItem("crab_bios") ? "Set" : "Not set");
+  }
+
+  if (pendingGbcBootrom === "remove") {
+    gbcBootromStatus.textContent = "None (pending)";
+  } else if (pendingGbcBootrom) {
+    gbcBootromStatus.textContent = pendingGbcBootrom.name + " (pending)";
+  } else {
+    let name = getStoredBiosName("crab_gbc_bootrom");
+    gbcBootromStatus.textContent = name || (localStorage.getItem("crab_gbc_bootrom") ? "Set" : "Not set");
+  }
+};
+
+const pickFile = (accept, callback) => {
   let input = document.createElement("input");
   input.type = "file";
-  input.accept = ".bin";
+  input.accept = accept;
   input.addEventListener("input", () => {
     if (input.files?.length > 0) {
+      let file = input.files[0];
       let reader = new FileReader();
-      reader.addEventListener("load", () => {
-        let bytes = new Uint8Array(reader.result);
-        writeBiosToFS(bytes);
-        saveBiosToStorage(bytes);
-      });
-      reader.readAsArrayBuffer(input.files[0]);
+      reader.addEventListener("load", () => callback(new Uint8Array(reader.result), file.name));
+      reader.readAsArrayBuffer(file);
     }
   });
   input.click();
+};
+
+document.getElementById("open-bios").addEventListener("click", () => {
+  menuDropdown.hidden = true;
+  pendingGbaBios = null;
+  pendingGbcBootrom = null;
+  updateBiosStatusText();
+  biosModal.classList.add("open");
+});
+
+document.getElementById("pick-gba-bios").addEventListener("click", () => {
+  pickFile(".bin", (bytes, name) => {
+    pendingGbaBios = { bytes, name };
+    updateBiosStatusText();
+  });
+});
+
+document.getElementById("pick-gbc-bootrom").addEventListener("click", () => {
+  pickFile(".bin", (bytes, name) => {
+    pendingGbcBootrom = { bytes, name };
+    updateBiosStatusText();
+  });
+});
+
+document.getElementById("remove-gba-bios").addEventListener("click", () => {
+  pendingGbaBios = "remove";
+  updateBiosStatusText();
+});
+
+document.getElementById("remove-gbc-bootrom").addEventListener("click", () => {
+  pendingGbcBootrom = "remove";
+  updateBiosStatusText();
+});
+
+const closeBiosModal = () => {
+  pendingGbaBios = null;
+  pendingGbcBootrom = null;
+  biosModal.classList.remove("open");
+};
+
+document.getElementById("bios-save").addEventListener("click", () => {
+  if (pendingGbaBios === "remove") {
+    localStorage.removeItem("crab_bios");
+    localStorage.removeItem("crab_bios_name");
+    try { FS.unlink("bios.bin"); } catch {}
+  } else if (pendingGbaBios) {
+    writeToFS("bios.bin", pendingGbaBios.bytes);
+    saveToStorage("crab_bios", pendingGbaBios.bytes);
+    localStorage.setItem("crab_bios_name", pendingGbaBios.name);
+  }
+  if (pendingGbcBootrom === "remove") {
+    localStorage.removeItem("crab_gbc_bootrom");
+    localStorage.removeItem("crab_gbc_bootrom_name");
+    try { FS.unlink("bootrom.bin"); } catch {}
+  } else if (pendingGbcBootrom) {
+    writeToFS("bootrom.bin", pendingGbcBootrom.bytes);
+    saveToStorage("crab_gbc_bootrom", pendingGbcBootrom.bytes);
+    localStorage.setItem("crab_gbc_bootrom_name", pendingGbcBootrom.name);
+  }
+  closeBiosModal();
+});
+
+document.getElementById("bios-cancel").addEventListener("click", closeBiosModal);
+
+biosModal.addEventListener("click", (e) => {
+  if (e.target === biosModal) closeBiosModal();
+});
+
+document.addEventListener("keydown", (e) => {
+  if (e.key === "Escape") closeBiosModal();
 });
 
 var currentRomName = null;
@@ -73,6 +193,7 @@ const loadRom = (romName) => {
 };
 
 document.getElementById("open-rom").addEventListener("click", () => {
+  menuDropdown.hidden = true;
   let input = document.createElement("input");
   input.type = "file";
   input.accept = ".gba,.gb,.gbc";

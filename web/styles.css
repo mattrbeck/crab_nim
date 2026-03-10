@@ -238,3 +238,90 @@ body {
   padding: 6px 8px;
   background-color: var(--alt-color);
 }
+
+#menu-container {
+  position: relative;
+}
+
+#menu-btn {
+  font-size: 18px;
+  line-height: 1;
+  padding: 2px 8px;
+}
+
+#menu-dropdown {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  z-index: 100;
+  background-color: var(--alt-color);
+  border: 1px solid var(--accent-color);
+  min-width: 140px;
+  margin-top: 2px;
+}
+
+.menu-item {
+  display: block;
+  width: 100%;
+  background: none;
+  color: var(--text-color);
+  border: none;
+  padding: 8px 12px;
+  text-align: left;
+  cursor: pointer;
+  font-size: 14px;
+}
+
+.menu-item:hover {
+  background-color: var(--accent-color);
+}
+
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  background: rgba(0, 0, 0, 0.6);
+  display: none;
+  align-items: center;
+  justify-content: center;
+}
+
+.modal-overlay.open {
+  display: flex;
+}
+
+.modal {
+  background-color: var(--fore-color);
+  border: 1px solid var(--accent-color);
+  padding: 16px 20px;
+  min-width: 280px;
+  max-width: 90vw;
+}
+
+.modal h3 {
+  margin: 0 0 12px;
+}
+
+.modal-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.modal-row span:first-child {
+  min-width: 100px;
+}
+
+.modal-row span:nth-child(2) {
+  flex: 1;
+  opacity: 0.7;
+  font-size: 13px;
+}
+
+.modal-actions {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+  margin-top: 16px;
+}
