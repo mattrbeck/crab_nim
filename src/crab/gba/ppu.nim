@@ -90,7 +90,7 @@ proc end_hblank*(ppu: PPU) =
 proc draw*(ppu: PPU) =
   ppu.frame = true
 
-proc se_address*(ppu: PPU; tx, ty, screen_size: int): int =
+proc se_address*(ppu: PPU; tx, ty, screen_size: int): int {.inline.} =
   var n = tx + ty * 32
   if tx >= 32: n += 0x03E0
   if ty >= 32 and screen_size == 0b11: n += 0x0400

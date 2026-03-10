@@ -322,8 +322,8 @@ proc read_word*(bus: Bus; address: uint32): uint32
 proc read_word_rotate*(bus: Bus; address: uint32): uint32
 proc read_half_rotate*(bus: Bus; address: uint32): uint32
 proc read_half_signed*(bus: Bus; address: uint32): uint32
-proc read_byte_internal*(bus: Bus; address: uint32): uint8
-proc read_word_internal*(bus: Bus; address: uint32): uint32
+proc read_byte_internal*(bus: Bus; address: uint32): uint8 {.inline.}
+proc read_word_internal*(bus: Bus; address: uint32): uint32 {.inline.}
 proc write_half_internal*(bus: Bus; address: uint32; value: uint16)
 proc write_word_internal*(bus: Bus; address: uint32; value: uint32)
 proc `[]`*(mmio: MMIO; address: uint32): uint8
@@ -342,24 +342,24 @@ proc start_hblank*(ppu: PPU)
 proc end_hblank*(ppu: PPU)
 proc write_half*(bus: Bus; address: uint32; value: uint16)
 proc write_word*(bus: Bus; address: uint32; value: uint32)
-proc fill_pipeline*(cpu: CPU)
-proc read_half_internal*(bus: Bus; address: uint32): uint16
-proc check_cond*(cpu: CPU; cond: uint32): bool
+proc fill_pipeline*(cpu: CPU) {.inline.}
+proc read_half_internal*(bus: Bus; address: uint32): uint16 {.inline.}
+proc check_cond*(cpu: CPU; cond: uint32): bool {.inline.}
 proc step_arm*(cpu: CPU) {.inline.}
 proc step_thumb*(cpu: CPU) {.inline.}
 proc set_reg*(cpu: CPU; reg: int; value: uint32): uint32 {.discardable, inline.}
 proc set_neg_and_zero_flags*(cpu: CPU; value: uint32) {.inline.}
 proc switch_mode*(cpu: CPU; new_mode: CpuMode)
-proc lsl*(cpu: CPU; word: uint32; bits: uint32; carry_out: ptr bool): uint32
-proc lsr*(cpu: CPU; word: uint32; bits: uint32; immediate: bool; carry_out: ptr bool): uint32
-proc asr*(cpu: CPU; word: uint32; bits: uint32; immediate: bool; carry_out: ptr bool): uint32
-proc ror*(cpu: CPU; word: uint32; bits: uint32; immediate: bool; carry_out: ptr bool): uint32
-proc sub*(cpu: CPU; operand_1, operand_2: uint32; set_conditions: bool): uint32
-proc sbc*(cpu: CPU; operand_1, operand_2: uint32; set_conditions: bool): uint32
-proc add*(cpu: CPU; operand_1, operand_2: uint32; set_conditions: bool): uint32
-proc adc*(cpu: CPU; operand_1, operand_2: uint32; set_conditions: bool): uint32
+proc lsl*(cpu: CPU; word: uint32; bits: uint32; carry_out: ptr bool): uint32 {.inline.}
+proc lsr*(cpu: CPU; word: uint32; bits: uint32; immediate: bool; carry_out: ptr bool): uint32 {.inline.}
+proc asr*(cpu: CPU; word: uint32; bits: uint32; immediate: bool; carry_out: ptr bool): uint32 {.inline.}
+proc ror*(cpu: CPU; word: uint32; bits: uint32; immediate: bool; carry_out: ptr bool): uint32 {.inline.}
+proc sub*(cpu: CPU; operand_1, operand_2: uint32; set_conditions: bool): uint32 {.inline.}
+proc sbc*(cpu: CPU; operand_1, operand_2: uint32; set_conditions: bool): uint32 {.inline.}
+proc add*(cpu: CPU; operand_1, operand_2: uint32; set_conditions: bool): uint32 {.inline.}
+proc adc*(cpu: CPU; operand_1, operand_2: uint32; set_conditions: bool): uint32 {.inline.}
 proc clear_pipeline*(cpu: CPU)
-proc read_instr*(cpu: CPU): uint32
+proc read_instr*(cpu: CPU): uint32 {.inline.}
 proc mode_bank*(m: CpuMode): int
 
 include pipeline

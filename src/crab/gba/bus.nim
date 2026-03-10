@@ -44,7 +44,7 @@ proc write_u32_ptr(buf: var seq[byte]; offset: uint32; val: uint32) {.inline.} =
 
 # ---- internal read implementations ----
 
-proc read_byte_internal*(bus: Bus; address: uint32): uint8 =
+proc read_byte_internal*(bus: Bus; address: uint32): uint8 {.inline.} =
   case bits_range(address, 24, 27)
   of 0x0: bus.bios[address and 0x3FFF'u32]
   of 0x1: 0'u8  # open bus todo
@@ -67,7 +67,7 @@ proc read_byte_internal*(bus: Bus; address: uint32): uint8 =
   of 0xE, 0xF: bus.gba.storage[address]
   else: raise newException(Exception, "Unmapped bus read: " & hex_str(address))
 
-proc read_half_internal*(bus: Bus; address: uint32): uint16 =
+proc read_half_internal*(bus: Bus; address: uint32): uint16 {.inline.} =
   let address = address and not 1'u32
   case bits_range(address, 24, 27)
   of 0x0: read_u16_ptr(bus.bios, address and 0x3FFF'u32)
@@ -93,7 +93,7 @@ proc read_half_internal*(bus: Bus; address: uint32): uint16 =
   of 0xE, 0xF: bus.gba.storage.read_half(address)
   else: raise newException(Exception, "Unmapped bus read_half: " & hex_str(address))
 
-proc read_word_internal*(bus: Bus; address: uint32): uint32 =
+proc read_word_internal*(bus: Bus; address: uint32): uint32 {.inline.} =
   let address = address and not 3'u32
   case bits_range(address, 24, 27)
   of 0x0: read_u32_ptr(bus.bios, address and 0x3FFF'u32)

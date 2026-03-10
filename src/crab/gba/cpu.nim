@@ -71,7 +71,7 @@ proc und*(cpu: CPU) =
   discard cpu.set_reg(14, lr)
   discard cpu.set_reg(15, 0x04'u32)
 
-proc fill_pipeline*(cpu: CPU) =
+proc fill_pipeline*(cpu: CPU) {.inline.} =
   if cpu.cpsr.thumb:
     let pc = cpu.r[15] and not 1'u32
     if cpu.pipeline.size == 0:
@@ -92,7 +92,7 @@ proc clear_pipeline*(cpu: CPU) =
   else:
     cpu.r[15] += 8
 
-proc read_instr*(cpu: CPU): uint32 =
+proc read_instr*(cpu: CPU): uint32 {.inline.} =
   if cpu.pipeline.size == 0:
     if cpu.cpsr.thumb:
       cpu.r[15] = cpu.r[15] and not 1'u32
@@ -118,7 +118,7 @@ proc step_arm*(cpu: CPU) {.inline.} =
 proc step_thumb*(cpu: CPU) {.inline.} =
   cpu.r[15] += 2
 
-proc check_cond*(cpu: CPU; cond: uint32): bool =
+proc check_cond*(cpu: CPU; cond: uint32): bool {.inline.} =
   case cond
   of 0x0: cpu.cpsr.zero
   of 0x1: not cpu.cpsr.zero
@@ -137,7 +137,7 @@ proc check_cond*(cpu: CPU; cond: uint32): bool =
   of 0xE: true
   else: false  # NV (never) - ARMv4T reserved, treated as no-op
 
-proc lsl*(cpu: CPU; word: uint32; bits: uint32; carry_out: ptr bool): uint32 =
+proc lsl*(cpu: CPU; word: uint32; bits: uint32; carry_out: ptr bool): uint32 {.inline.} =
   log("lsl - word:" & hex_str(word) & ", bits:" & $bits)
   if bits == 0: return word
   if bits < 32:
@@ -150,7 +150,7 @@ proc lsl*(cpu: CPU; word: uint32; bits: uint32; carry_out: ptr bool): uint32 =
     carry_out[] = false
     0'u32
 
-proc lsr*(cpu: CPU; word: uint32; bits: uint32; immediate: bool; carry_out: ptr bool): uint32 =
+proc lsr*(cpu: CPU; word: uint32; bits: uint32; immediate: bool; carry_out: ptr bool): uint32 {.inline.} =
   log("lsr - word:" & hex_str(word) & ", bits:" & $bits)
   var b = bits
   if b == 0:
@@ -166,7 +166,7 @@ proc lsr*(cpu: CPU; word: uint32; bits: uint32; immediate: bool; carry_out: ptr 
     carry_out[] = false
     0'u32
 
-proc asr*(cpu: CPU; word: uint32; bits: uint32; immediate: bool; carry_out: ptr bool): uint32 =
+proc asr*(cpu: CPU; word: uint32; bits: uint32; immediate: bool; carry_out: ptr bool): uint32 {.inline.} =
   log("asr - word:" & hex_str(word) & ", bits:" & $bits)
   var b = bits
   if b == 0:
@@ -179,7 +179,7 @@ proc asr*(cpu: CPU; word: uint32; bits: uint32; immediate: bool; carry_out: ptr 
     carry_out[] = bit(word, 31)
     0xFFFFFFFF'u32 * (word shr 31)
 
-proc ror*(cpu: CPU; word: uint32; bits: uint32; immediate: bool; carry_out: ptr bool): uint32 =
+proc ror*(cpu: CPU; word: uint32; bits: uint32; immediate: bool; carry_out: ptr bool): uint32 {.inline.} =
   log("ror - word:" & hex_str(word) & ", bits:" & $bits)
   if bits == 0:
     if not immediate: return word
@@ -192,7 +192,7 @@ proc ror*(cpu: CPU; word: uint32; bits: uint32; immediate: bool; carry_out: ptr 
   carry_out[] = bit(word, int(b - 1))
   (word shr b) or (word shl (32 - b))
 
-proc sub*(cpu: CPU; operand_1, operand_2: uint32; set_conditions: bool): uint32 =
+proc sub*(cpu: CPU; operand_1, operand_2: uint32; set_conditions: bool): uint32 {.inline.} =
   log("sub - operand_1:" & hex_str(operand_1) & ", operand_2:" & hex_str(operand_2))
   let res = operand_1 - operand_2
   if set_conditions:
@@ -201,7 +201,7 @@ proc sub*(cpu: CPU; operand_1, operand_2: uint32; set_conditions: bool): uint32 
     cpu.cpsr.overflow = bit((operand_1 xor operand_2) and (operand_1 xor res), 31)
   res
 
-proc sbc*(cpu: CPU; operand_1, operand_2: uint32; set_conditions: bool): uint32 =
+proc sbc*(cpu: CPU; operand_1, operand_2: uint32; set_conditions: bool): uint32 {.inline.} =
   log("sbc - operand_1:" & hex_str(operand_1) & ", operand_2:" & hex_str(operand_2))
   let c   = uint32(cpu.cpsr.carry)
   let res = operand_1 - operand_2 - 1 + c
@@ -211,7 +211,7 @@ proc sbc*(cpu: CPU; operand_1, operand_2: uint32; set_conditions: bool): uint32 
     cpu.cpsr.overflow = bit((operand_1 xor operand_2) and (operand_1 xor res), 31)
   res
 
-proc add*(cpu: CPU; operand_1, operand_2: uint32; set_conditions: bool): uint32 =
+proc add*(cpu: CPU; operand_1, operand_2: uint32; set_conditions: bool): uint32 {.inline.} =
   log("add - operand_1:" & hex_str(operand_1) & ", operand_2:" & hex_str(operand_2))
   let res = operand_1 + operand_2
   if set_conditions:
@@ -220,7 +220,7 @@ proc add*(cpu: CPU; operand_1, operand_2: uint32; set_conditions: bool): uint32 
     cpu.cpsr.overflow = bit(not (operand_1 xor operand_2) and (operand_2 xor res), 31)
   res
 
-proc adc*(cpu: CPU; operand_1, operand_2: uint32; set_conditions: bool): uint32 =
+proc adc*(cpu: CPU; operand_1, operand_2: uint32; set_conditions: bool): uint32 {.inline.} =
   log("adc - operand_1:" & hex_str(operand_1) & ", operand_2:" & hex_str(operand_2))
   let c   = uint32(cpu.cpsr.carry)
   let res = operand_1 + operand_2 + c
