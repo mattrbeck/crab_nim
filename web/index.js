@@ -511,11 +511,14 @@ var Module = {
       lastFrameTime = timestamp;
       if (fastForward) {
         // Run as many frames as possible within ~16ms budget
+        // Reset playTime so audio plays immediately (sped up) instead of
+        // queuing behind previously scheduled buffers
+        if (audioCtx) playTime = audioCtx.currentTime;
         const budget = 16;
         const start = performance.now();
         while (performance.now() - start < budget) {
           Module._loop_tick();
-          Module._clearAudioBuffer();
+          pushAudio();
           frameCount++;
         }
         accumulator = 0;
