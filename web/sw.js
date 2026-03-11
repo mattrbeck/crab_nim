@@ -2,15 +2,13 @@
 const CACHE_VERSION = "v1";
 const CACHE_NAME = "crab-" + CACHE_VERSION;
 
-// Only cache small UI files. Emscripten outputs (em.js, em.wasm) are excluded
-// because iOS Safari has issues with WebAssembly.instantiateStreaming() on
-// responses served from the Cache API, and the browser caches compiled WASM
-// separately anyway.
 const ASSETS = [
   "./",
   "./index.html",
   "./index.js",
   "./styles.css",
+  "./em.js",
+  "./em.wasm",
   "./manifest.json",
   "./apple-touch-icon-precomposed.png",
 ];
