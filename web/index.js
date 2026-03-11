@@ -51,6 +51,13 @@ const log = (message) => {
   if (shouldScroll) logDiv.scroll({ top: logDiv.scrollHeight });
 };
 
+window.onerror = (msg, src, line, col, err) => {
+  log(`ERROR: ${msg} (${src}:${line}:${col})`);
+};
+window.addEventListener("unhandledrejection", (e) => {
+  log("REJECT: " + e.reason);
+});
+
 // --- IndexedDB storage ---
 
 const DB_NAME = "crab";
