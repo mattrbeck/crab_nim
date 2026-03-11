@@ -56,6 +56,7 @@ const showLogButton = document.getElementById("show-log");
 const logDiv = document.getElementById("log");
 logDiv.hidden = true;
 showLogButton.addEventListener("click", () => {
+  menuDropdown.hidden = true;
   logDiv.hidden = !logDiv.hidden;
   logDiv.scroll({ top: logDiv.scrollHeight });
 });
