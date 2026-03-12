@@ -1,5 +1,5 @@
-// Bump this version string with each deploy to invalidate the cache.
-const CACHE_VERSION = "v1";
+// Replaced automatically with the git commit hash during CI build.
+const CACHE_VERSION = "dev";
 const CACHE_NAME = "dingbat-" + CACHE_VERSION;
 
 const ASSETS = [
