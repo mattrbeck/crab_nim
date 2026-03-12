@@ -1,6 +1,6 @@
-# crab_nim Notes
+# dingbat Notes
 
-This directory contains development notes for the crab_nim GBA emulator — a Crystal→Nim rewrite of [crab](https://github.com/mattrberry/crab).
+This directory contains development notes for the dingbat GBA emulator — a Crystal→Nim rewrite of [crab](https://github.com/mattrberry/crab).
 
 ## Files
 

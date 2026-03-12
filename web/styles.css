@@ -276,6 +276,12 @@ body {
   background-color: var(--accent-color);
 }
 
+.menu-sep {
+  border: none;
+  border-top: 1px solid rgba(255, 255, 255, 0.12);
+  margin: 4px 0;
+}
+
 .modal-overlay {
   position: fixed;
   inset: 0;

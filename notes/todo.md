@@ -2,43 +2,43 @@
 
 ## TODOs in Code
 
-### `src/crab/gba/bus.nim:84`
+### `src/dingbat/gba/bus.nim:84`
 ```nim
 of 0x1: 0'u8  # open bus todo
 ```
 Memory region 0x1 (unmapped between BIOS and EWRAM) should return the proper open bus value (the last fetched instruction word), but currently returns 0. Low-priority; rarely accessed in practice.
 
-### `src/crab/gba/rtc.nim:85`
+### `src/dingbat/gba/rtc.nim:85`
 ```nim
 if rtc.irq: echo "TODO: implement rtc irq"
 ```
 RTC can signal an IRQ (e.g., every second, or at a set alarm time). The IRQ line from the RTC to the GBA interrupt controller is not wired up. Games that use timed RTC events may behave incorrectly. Medium priority.
 
-### `src/crab/gba/arm/block_data_transfer.nim:13`
+### `src/dingbat/gba/arm/block_data_transfer.nim:13`
 ```nim
 raise newException(Exception, "todo: handle cases with r15 in list")
 ```
 When R15 (PC) appears in the register list of LDM/STM, there are special behaviors (for LDM: load value into PC, optionally copying SPSR to CPSR; for STM: the stored value is PC+12 or PC+8). This is uncommon but used by some games for long jumps/returns. Will crash if hit.
 
-### `src/crab/gba/keypad.nim:15`
+### `src/dingbat/gba/keypad.nim:15`
 ```nim
 discard  # TODO: stop mode via keycnt
 ```
 KEYCNT (key interrupt control) can trigger a STOP mode when certain key combinations are pressed. Stop mode is a deep sleep state. Not implemented — write to KEYCNT is silently ignored.
 
-### `src/crab/gba/mmio.nim:30`
+### `src/dingbat/gba/mmio.nim:30`
 ```nim
 of 0x120..0x12B, 0x134..0x15B: discard  # serial, todo
 ```
 Serial communication registers (SIO, JOY bus) are silently discarded. Games that use multiplayer/serial features will not work. Low priority for single-player emulation.
 
-### `src/crab/gba/mmio.nim:36`
+### `src/dingbat/gba/mmio.nim:36`
 ```nim
 discard  # TODO: stop mode
 ```
 Writing to HALTCNT with bit 7 set should trigger STOP mode (deep sleep until a keypad interrupt). Currently a no-op. Related to the KEYCNT TODO above.
 
-### `src/crab/gba/dma.nim:109`
+### `src/dingbat/gba/dma.nim:109`
 ```nim
 echo "todo: video capture dma"
 ```

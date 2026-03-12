@@ -1,6 +1,6 @@
 // Bump this version string with each deploy to invalidate the cache.
 const CACHE_VERSION = "v1";
-const CACHE_NAME = "crab-" + CACHE_VERSION;
+const CACHE_NAME = "dingbat-" + CACHE_VERSION;
 
 const ASSETS = [
   "./",
@@ -27,7 +27,7 @@ self.addEventListener("activate", (event) => {
     caches.keys().then((keys) =>
       Promise.all(
         keys
-          .filter((key) => key.startsWith("crab-") && key !== CACHE_NAME)
+          .filter((key) => key.startsWith("dingbat-") && key !== CACHE_NAME)
           .map((key) => caches.delete(key))
       )
     )

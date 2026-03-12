@@ -86,7 +86,7 @@ window.addEventListener("unhandledrejection", (e) => {
 
 // --- IndexedDB storage ---
 
-const DB_NAME = "crab";
+const DB_NAME = "dingbat";
 const DB_VERSION = 1;
 let db = null;
 
@@ -131,36 +131,36 @@ const migrateFromLocalStorage = async () => {
   };
 
   // Migrate GBA BIOS
-  let gbaBios = localStorage.getItem("crab_bios");
+  let gbaBios = localStorage.getItem("dingbat_bios");
   if (gbaBios) {
-    let name = localStorage.getItem("crab_bios_name") || null;
+    let name = localStorage.getItem("dingbat_bios_name") || null;
     await dbPut("bios:gba", { name, data: decodeBase64(gbaBios) });
-    localStorage.removeItem("crab_bios");
-    localStorage.removeItem("crab_bios_name");
+    localStorage.removeItem("dingbat_bios");
+    localStorage.removeItem("dingbat_bios_name");
   }
 
   // Migrate GBC bootrom
-  let gbcBootrom = localStorage.getItem("crab_gbc_bootrom");
+  let gbcBootrom = localStorage.getItem("dingbat_gbc_bootrom");
   if (gbcBootrom) {
-    let name = localStorage.getItem("crab_gbc_bootrom_name") || null;
+    let name = localStorage.getItem("dingbat_gbc_bootrom_name") || null;
     await dbPut("bios:gbc", { name, data: decodeBase64(gbcBootrom) });
-    localStorage.removeItem("crab_gbc_bootrom");
-    localStorage.removeItem("crab_gbc_bootrom_name");
+    localStorage.removeItem("dingbat_gbc_bootrom");
+    localStorage.removeItem("dingbat_gbc_bootrom_name");
   }
 
   // Migrate recent ROMs
-  let recentRaw = localStorage.getItem("crab_recent_roms");
+  let recentRaw = localStorage.getItem("dingbat_recent_roms");
   if (recentRaw) {
     try {
       let list = JSON.parse(recentRaw);
       let migrated = list.map(r => ({ name: r.name, data: decodeBase64(r.data) }));
       await dbPut("recent", migrated);
     } catch {}
-    localStorage.removeItem("crab_recent_roms");
+    localStorage.removeItem("dingbat_recent_roms");
   }
 
   // Migrate saves
-  let savesRaw = localStorage.getItem("crab_saves");
+  let savesRaw = localStorage.getItem("dingbat_saves");
   if (savesRaw) {
     try {
       let saves = JSON.parse(savesRaw);
@@ -168,7 +168,7 @@ const migrateFromLocalStorage = async () => {
         await dbPut("save:" + key, decodeBase64(b64));
       }
     } catch {}
-    localStorage.removeItem("crab_saves");
+    localStorage.removeItem("dingbat_saves");
   }
 };
 

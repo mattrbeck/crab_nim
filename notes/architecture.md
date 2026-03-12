@@ -3,10 +3,10 @@
 ## Project Layout
 
 ```
-crab_nim/
+dingbat/
 ├── src/
-│   ├── crab.nim                  # SDL2 frontend (main entry point)
-│   └── crab/
+│   ├── dingbat.nim               # SDL2 frontend (main entry point)
+│   └── dingbat/
 │       ├── common/
 │       │   └── input.nim         # Input enum (A/B/Start/Select/Directions/L/R)
 │       └── gba/
@@ -47,7 +47,7 @@ crab_nim/
 │               ├── flash.nim
 │               └── eeprom.nim
 ├── nim.cfg                       # Nim compiler config (SDL2 linking, etc.)
-├── crab.nimble                   # Nimble package config
+├── dingbat.nimble                   # Nimble package config
 └── reference/crab/               # Original Crystal source (reference only)
 ```
 
@@ -57,9 +57,9 @@ crab_nim/
 
 ```nim
 # In gba.nim:
-include crab/gba/bus
-include crab/gba/cpu
-include crab/gba/ppu
+include dingbat/gba/bus
+include dingbat/gba/cpu
+include dingbat/gba/ppu
 # ... etc
 ```
 
@@ -106,7 +106,7 @@ The project links SDL2 via `nim.cfg`:
 passL = "-lSDL2"
 ```
 
-The `sdl2` Nim package is used for higher-level SDL2 in `src/crab.nim` (window, renderer, events). For audio, the package is missing `SDL_ClearQueuedAudio`, so `apu.nim` declares raw C bindings directly:
+The `sdl2` Nim package is used for higher-level SDL2 in `src/dingbat.nim` (window, renderer, events). For audio, the package is missing `SDL_ClearQueuedAudio`, so `apu.nim` declares raw C bindings directly:
 
 ```nim
 proc sdl_clear_queued_audio(dev: SDL_AudioDeviceID)
@@ -150,20 +150,20 @@ SWI dispatch is intercepted at the Nim level in `arm/software_interrupt.nim` (`h
 
 ```bash
 # Release build
-nim c -d:release src/crab.nim
+nim c -d:release src/dingbat.nim
 
 # Debug build
-nim c src/crab.nim
+nim c src/dingbat.nim
 
 # Run with real BIOS
-./crab /path/to/gba_bios.bin /path/to/rom.gba
+./dingbat /path/to/gba_bios.bin /path/to/rom.gba
 
 # Run without BIOS (HLE mode)
-./crab /path/to/rom.gba
+./dingbat /path/to/rom.gba
 
 # Options
-./crab --run-bios  ...   # (default) boot through BIOS intro
-./crab --skip-bios ...   # skip BIOS intro (not yet implemented -- currently same as --run-bios)
+./dingbat --run-bios  ...   # (default) boot through BIOS intro
+./dingbat --skip-bios ...   # skip BIOS intro (not yet implemented -- currently same as --run-bios)
 ```
 
 ## Crystal → Nim Translation Patterns

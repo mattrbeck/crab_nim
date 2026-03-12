@@ -33,7 +33,7 @@ jobs:
         run: nimble install -y sdl2
 
       - name: Build WASM
-        run: nim c -d:emscripten src/crab_wasm.nim
+        run: nim c -d:emscripten src/dingbat_wasm.nim
 
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v3

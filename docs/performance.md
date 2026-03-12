@@ -1,13 +1,13 @@
 # Performance Optimization Log
 
 This document tracks performance profiling and optimization work on the
-crab_nim emulator. It serves as a reference for future optimization efforts.
+dingbat emulator. It serves as a reference for future optimization efforts.
 
 ## Profiling Setup
 
 - **ROM:** Pokemon Ruby (GBA) — representative of real-world game workload
 - **Tool:** macOS `sample` (1ms sampling interval, 10-second runs)
-- **Build:** `nim c -d:danger -d:lto --opt:speed src/crab.nim`
+- **Build:** `nim c -d:danger -d:lto --opt:speed src/dingbat.nim`
 - **Hardware:** Apple Silicon (ARM64)
 
 ## Optimization History (2026-03-09)

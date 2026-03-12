@@ -3,19 +3,19 @@
 ## Completed Work
 
 ### Phase 1: Initial Nim Port (pre-session)
-- Ported all Crystal source files to Nim under `src/crab/gba/`
+- Ported all Crystal source files to Nim under `src/dingbat/gba/`
 - Fixed all compilation errors (type mismatches, forward declarations, include order)
-- Added SDL2 frontend (`src/crab.nim`) with keyboard input and video rendering
+- Added SDL2 frontend (`src/dingbat.nim`) with keyboard input and video rendering
 - Fixed ARM exception handling
 
 ### Phase 2: Runtime Fixes
 
 #### Fix: Infinite recursion / segfault on Kirby ROM
-**Problem**: Stack overflow when launching `./crab KirbyNightmareInDreamland.gba`.
+**Problem**: Stack overflow when launching `./dingbat KirbyNightmareInDreamland.gba`.
 - `ppu[]` else-clause called `read_open_bus_value(io_addr)`, which called `read_word_internal(cpu.r[15])`.
 - When PC pointed into MMIO space (0x04xxxxxxx), this re-entered MMIO reads → infinite loop.
 
-**Fix** (`src/crab/gba/bus.nim`):
+**Fix** (`src/dingbat/gba/bus.nim`):
 - Added guard in `read_open_bus_value`: if PC is in region 0x4 (MMIO) or > 0xD (unmapped), return 0.
 
 #### Fix: All ROMs freezing on startup
@@ -24,7 +24,7 @@
 - SWI instructions jump to 0x08 in supervisor mode. Zero bytes decode as `ANDEQ R0, R0, R0` — CPU looped forever executing no-ops.
 - IRQ vector at 0x18 was also zeros — interrupts also went nowhere.
 
-**Fix — HLE BIOS** (`src/crab/gba/bus.nim`, `arm/software_interrupt.nim`, `thumb/software_interrupt.nim`):
+**Fix — HLE BIOS** (`src/dingbat/gba/bus.nim`, `arm/software_interrupt.nim`, `thumb/software_interrupt.nim`):
 
 1. **ARM-level SWI interception**: In `arm_software_interrupt` and `thumb_software_interrupt`, when `gba.bios_path == ""`, dispatch SWI at the Nim level instead of jumping to 0x08.
    - SWI 02h / 06h (Halt): set `cpu.halted = true`
@@ -47,12 +47,12 @@
 #### Fix: No audio output
 **Problem**: APU was correctly generating samples but had `# TODO: SDL audio` stubs instead of actual output.
 
-**Fix** (`src/crab/gba/apu.nim`, `src/crab/gba/gba.nim`, `src/crab.nim`):
+**Fix** (`src/dingbat/gba/apu.nim`, `src/dingbat/gba/gba.nim`, `src/dingbat.nim`):
 - Added raw C bindings for `SDL_OpenAudio`, `SDL_PauseAudio`, `SDL_QueueAudio`, `SDL_GetQueuedAudioSize`, `SDL_ClearQueuedAudio` (the Nim SDL2 package is missing `SDL_ClearQueuedAudio`).
 - In `new_apu`: call `SDL_OpenAudio` with 32768 Hz, S16LE, stereo, 512 samples/buffer. Unpause with `SDL_PauseAudio(0)`.
 - In `get_sample`: when buffer fills, optionally clear queue (async mode) or throttle until queue < 2 buffers (sync mode), then `SDL_QueueAudio`.
 - Added `audio_dev: uint32` field to `APU` type in `gba.nim` (`SDL_OpenAudio` always assigns device ID 1).
-- Moved `sdl2.init(INIT_VIDEO or INIT_AUDIO)` in `crab.nim` to before `new_gba()` — APU opens the audio device during construction.
+- Moved `sdl2.init(INIT_VIDEO or INIT_AUDIO)` in `dingbat.nim` to before `new_gba()` — APU opens the audio device during construction.
 
 ### Phase 3: ARM Instruction Set Correctness
 
@@ -61,7 +61,7 @@
 takes shift amount mod 32, so `1 shl 32 = 1` instead of 0. This caused `LSLS r0, r1` (r1=32)
 to produce result=1 (Z clear) instead of result=0 (Z set), failing the branch test.
 
-**Fix** (`src/crab/gba/cpu.nim` — `lsl` proc):
+**Fix** (`src/dingbat/gba/cpu.nim` — `lsl` proc):
 Handle all shift-amount cases explicitly per ARM7TDMI spec:
 - `bits == 0`: return word unchanged
 - `bits < 32`: normal shift
@@ -75,7 +75,7 @@ Crystal didn't have this problem because Crystal's `<<` operator returns 0 for s
 `int64(uint64(rm) * uint64(rs))`, which throws `RangeDefect` at runtime when the product exceeds
 `int64.max` — since Nim debug builds check integer range on conversion.
 
-**Fix** (`src/crab/gba/arm/multiply_long.nim`):
+**Fix** (`src/dingbat/gba/arm/multiply_long.nim`):
 Changed `res` from `int64` to `uint64`, matching Crystal's `UInt64` type. The signed path uses
 `cast[uint64](int64_product)` (bitwise reinterpret, no range check). All arithmetic and
 `set_reg` calls now use pure `uint64` — no checked conversions.
@@ -86,7 +86,7 @@ Changed `res` from `int64` to `uint64`, matching Crystal's `UInt64` type. The si
 `if` block ended — before the transfer loop. The STM then ran in the original (FIQ) mode,
 storing FIQ-banked r8 (64) instead of USR-banked r8 (32).
 
-**Fix** (`src/crab/gba/arm/block_data_transfer.nim`):
+**Fix** (`src/dingbat/gba/arm/block_data_transfer.nim`):
 Removed `defer`. Now matches Crystal exactly: save mode before `switch_mode(USR)`, run the
 transfer loop, then explicitly call `switch_mode(saved_mode)` after the loop (outside the
 `if` block).
@@ -111,7 +111,7 @@ On macOS (little-endian), SDL2 performs byte-swap conversion from the declared b
 format to the system's little-endian format. But the actual sample data in the buffer is
 already little-endian, so SDL double-swaps every float, completely garbling the audio.
 
-**Fix** (`src/crab/gb/apu.nim`):
+**Fix** (`src/dingbat/gb/apu.nim`):
 - Changed constant to `AUDIO_F32LSB = 0x8120` (little-endian float32), matching the GBA
   APU which correctly uses `AUDIO_S16LSB = 0x8010`.
 - Also changed initialization to call `tick_frame_sequencer` and `get_sample` directly
@@ -128,7 +128,7 @@ Crystal's single `||` condition exactly.
 
 ### Refactor: GBA bitfield registers — native packed objects
 
-Replaced the custom `bitfield` macro (`src/crab/bitfield.nim`) with Nim's native
+Replaced the custom `bitfield` macro (`src/dingbat/bitfield.nim`) with Nim's native
 `{.packed.}` + `{.bitsize:N.}` struct pragmas, mirroring `reference/gba`'s approach.
 
 **Why**: The macro approach generated a wrapper type with a `.value: T` field and
@@ -136,7 +136,7 @@ individual getter/setter procs. The native approach maps directly to hardware la
 without any wrapper — fields are accessed directly as struct members.
 
 **Key changes**:
-- `src/crab/gba/reg.nim` — complete rewrite; all 24 GBA I/O registers now use
+- `src/dingbat/gba/reg.nim` — complete rewrite; all 24 GBA I/O registers now use
   `{.packed.}` objects. Added `GbaReg16` type class and `converter toU16`/`toU32`
   for implicit coercions. Added `read(reg, byteNum)` and `write(reg, value, byteNum)`
   procs for both packed register types and plain `uint16 | uint32`.

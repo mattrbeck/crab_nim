@@ -1,6 +1,6 @@
-<p align="center"><img width="200" src="README/crab.png"></p>
+<p align="center"><img width="200" src="README/dingbat.png" style="image-rendering: pixelated"></p>
 
-Crab is a Game Boy, Game Boy Color, and Game Boy Advance emulator written in Nim. Game Boy and Game Boy Color emulation are very accurate, while Game Boy Advance is considered playable in many games.
+Dingbat is a Game Boy, Game Boy Color, and Game Boy Advance emulator written in Nim. Game Boy and Game Boy Color emulation are very accurate, while Game Boy Advance is considered playable in many games.
 
 The Game Boy and Game Boy Color work would not be possible without the [Pan Docs](https://gbdev.io/pandocs), [izik's opcode table](https://izik1.github.io/gbops), the [gbz80 opcode reference](https://rednex.github.io/rgbds/gbz80.7.html), [The Cycle-Accurate Game Boy Docs](https://github.com/AntonioND/giibiiadvance/blob/master/docs/TCAGBD.pdf), or gekkio's [Game Boy: Complete Technical Reference](https://gekkio.fi/files/gb-docs/gbctr.pdf). The Game Boy Advance work would not be possible without [GBATEK](http://problemkaputt.de/gbatek.htm), [Tonc](https://www.coranac.com/tonc), [mGBA](https://mgba.io/), or the wonderful emudev community.
 
@@ -10,23 +10,23 @@ The Game Boy and Game Boy Color work would not be possible without the [Pan Docs
 
 [SDL2](https://www.libsdl.org/) and [Dear ImGui](https://github.com/ocornut/imgui) (via [imguin](https://github.com/dinau/imguin)) are required. SDL2 is available on every major package manager.
 
-After cloning the repository, run `nimble build -d:release` to build the emulator in release mode. This will place the binary at `./crab`.
+After cloning the repository, run `nimble build -d:release` to build the emulator in release mode. This will place the binary at `./dingbat`.
 
 ### WASM / Browser Build
 
 To build for the browser using Emscripten:
 
 ```
-nim c -d:emscripten src/crab_wasm.nim
+nim c -d:emscripten src/dingbat_wasm.nim
 ```
 
 Then serve the `web/` directory with `python3 web/serve.py` (required for SharedArrayBuffer support).
 
 ## Usage
 
-Running the emulator is as simple as running the `crab` executable. If you'd rather launch a specific ROM directly, you can pass it as a command-line argument: `./crab /path/to/rom`.
+Running the emulator is as simple as running the `dingbat` executable. If you'd rather launch a specific ROM directly, you can pass it as a command-line argument: `./dingbat /path/to/rom`.
 
-A GBA BIOS is required for GBA emulation. You can select it through the UI or place it at `~/.config/crab/bios.bin`.
+A GBA BIOS is required for GBA emulation. You can select it through the UI or place it at `~/.config/dingbat/bios.bin`.
 
 ### Controls
 
@@ -41,6 +41,7 @@ To enable the experimental FIFO renderer (as opposed to the scanline renderer), 
 ## Features and Remaining Work
 
 ### Features
+
 - Frontend
   - Open ROMs
   - Select BIOS
@@ -83,6 +84,7 @@ To enable the experimental FIFO renderer (as opposed to the scanline renderer), 
   - Browser/WASM build
 
 ### Remaining Work
+
 - GB / GBC
   - Pixel FIFO: sprites on column 0 of the LCD not yet rendered
   - MBC5 rumble
