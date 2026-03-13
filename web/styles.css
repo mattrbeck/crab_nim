@@ -54,14 +54,12 @@ body {
 
 #controls {
   height: 100%;
-  display: flex;
-  flex-wrap: wrap;
-  align-content: space-between;
+  display: grid;
+  grid-template-rows: auto 1fr auto;
 }
 
 #lr,
 #select-start {
-  width: 100%;
   display: flex;
   justify-content: space-evenly;
   gap: 9px;
@@ -76,32 +74,35 @@ body {
 }
 
 #lr,
-#select-start,
-#ab {
+#select-start {
   text-align: center;
   text-transform: uppercase;
   line-height: 50px;
   color: var(--accent-color);
 }
 
-#main-controls {
-  margin: 9px;
-  display: flex;
-  justify-content: center;
-  flex-wrap: wrap;
-  width: 100%;
+#ab {
+  text-align: center;
+  text-transform: uppercase;
+  color: var(--accent-color);
 }
 
-#main-controls > div {
-  margin: 1em;
+#main-controls {
+  container-type: size;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0 9px;
+  min-height: 0;
 }
 
 #dpad {
-  width: 150px;
-  height: 150px;
+  --dpad-size: min(50cqi, 300px, 100cqb);
+  width: var(--dpad-size);
+  aspect-ratio: 1 / 1;
   display: grid;
-  grid-template-columns: 50px 50px 50px;
-  grid-template-rows: 50px 50px 50px;
+  grid-template-columns: 1fr 1fr 1fr;
+  grid-template-rows: 1fr 1fr 1fr;
 }
 
 #dpad > #up,
@@ -148,19 +149,20 @@ body {
 }
 
 #ab {
-  display: flex;
-  width: 120px;
-  height: 150px;
+  --btn-size: min(calc(50cqi / 3), 100px, calc(100cqb / 3));
+  width: calc(var(--btn-size) * 2.4);
+  height: min(50cqi, 300px, 100cqb);
   position: relative;
 }
 
 #a,
 #b {
-  width: 50px;
-  height: 50px;
-  border-radius: 25px;
+  width: var(--btn-size);
+  height: var(--btn-size);
+  border-radius: 50%;
   border: 1px solid var(--accent-color);
   position: absolute;
+  line-height: var(--btn-size);
 }
 
 #a {
