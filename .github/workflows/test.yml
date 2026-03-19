@@ -6,6 +6,8 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: jiro4989/setup-nim-action@v2
+      - name: Install dependencies
+        run: nimble install -d -y
       - name: Build test harness
         run: nim c -d:test_harness -d:release --path:src -o:dingbat_test tests/dingbat_test.nim
       - name: Build test runner
