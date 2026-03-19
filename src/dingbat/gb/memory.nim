@@ -122,7 +122,11 @@ proc write_byte*(mem: GbMemory; gb: GB; idx: int; val: uint8) =
   of 0xFE00..0xFE9F: ppu_write(gb.ppu, gb, idx, val)
   of 0xFEA0..0xFEFF: discard
   of 0xFF00:         joypad_write(gb.joypad, val)
-  of 0xFF01:         discard  # Serial data (stub)
+  of 0xFF01:
+    when defined(test_harness):
+      if gb.test_output != nil:
+        gb.test_output.serial_buffer.add(char(val))
+    else: discard  # Serial data (stub)
   of 0xFF04..0xFF07: timer_write(gb.timer, gb, idx, val)
   of 0xFF0F:         irq_write(gb.interrupts, idx, val)
   of 0xFF10..0xFF3F: apu_write(gb.apu, idx, val, gb)

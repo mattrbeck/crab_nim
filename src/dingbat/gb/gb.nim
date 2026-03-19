@@ -3,6 +3,8 @@
 
 import std/[os, strutils]
 import ../common/[input, scheduler, emu, resampler]
+when defined(test_harness):
+  import ../common/test_output
 
 # ==================== TYPE DECLARATIONS ====================
 # All GB types in one block for forward-reference support.
@@ -285,6 +287,8 @@ type
     timer*:          GbTimer
     memory*:         GbMemory
     apu*:            GbApu
+    when defined(test_harness):
+      test_output*:  TestOutput
 
 # ==================== FETCHER ORDER ====================
 const FETCHER_ORDER*: array[7, FetchStage] = [

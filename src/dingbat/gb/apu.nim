@@ -4,35 +4,36 @@ when defined(emscripten):
   proc appendAudioSample(left, right: float32) {.importc, cdecl.}
 
 # SDL2 audio bindings
-when not declared(SDL_AudioSpec):
-  type
-    SDL_AudioSpec = object
-      freq:      cint
-      format:    uint16
-      channels:  uint8
-      silence:   uint8
-      samples:   uint16
-      padding:   uint16
-      size:      uint32
-      callback:  pointer
-      userdata:  pointer
+when not defined(test_harness):
+  when not declared(SDL_AudioSpec):
+    type
+      SDL_AudioSpec = object
+        freq:      cint
+        format:    uint16
+        channels:  uint8
+        silence:   uint8
+        samples:   uint16
+        padding:   uint16
+        size:      uint32
+        callback:  pointer
+        userdata:  pointer
 
-  const AUDIO_F32LSB = 0x8120'u16  # 32-bit float, little-endian (native on x86/ARM)
+    const AUDIO_F32LSB = 0x8120'u16  # 32-bit float, little-endian (native on x86/ARM)
 
-  proc sdl_open_audio_gb(desired: ptr SDL_AudioSpec; obtained: ptr SDL_AudioSpec): cint
-    {.importc: "SDL_OpenAudio", cdecl.}
-  proc sdl_close_audio_gb()
-    {.importc: "SDL_CloseAudio", cdecl.}
-  proc sdl_pause_audio_gb(pause_on: cint)
-    {.importc: "SDL_PauseAudio", cdecl.}
-  proc sdl_queue_audio_gb(dev: uint32; data: pointer; len: uint32): cint
-    {.importc: "SDL_QueueAudio", cdecl.}
-  proc sdl_get_queued_audio_size_gb(dev: uint32): uint32
-    {.importc: "SDL_GetQueuedAudioSize", cdecl.}
-  proc sdl_clear_queued_audio_gb(dev: uint32)
-    {.importc: "SDL_ClearQueuedAudio", cdecl.}
-  proc sdl_delay_gb(ms: uint32)
-    {.importc: "SDL_Delay", cdecl.}
+    proc sdl_open_audio_gb(desired: ptr SDL_AudioSpec; obtained: ptr SDL_AudioSpec): cint
+      {.importc: "SDL_OpenAudio", cdecl.}
+    proc sdl_close_audio_gb()
+      {.importc: "SDL_CloseAudio", cdecl.}
+    proc sdl_pause_audio_gb(pause_on: cint)
+      {.importc: "SDL_PauseAudio", cdecl.}
+    proc sdl_queue_audio_gb(dev: uint32; data: pointer; len: uint32): cint
+      {.importc: "SDL_QueueAudio", cdecl.}
+    proc sdl_get_queued_audio_size_gb(dev: uint32): uint32
+      {.importc: "SDL_GetQueuedAudioSize", cdecl.}
+    proc sdl_clear_queued_audio_gb(dev: uint32)
+      {.importc: "SDL_ClearQueuedAudio", cdecl.}
+    proc sdl_delay_gb(ms: uint32)
+      {.importc: "SDL_Delay", cdecl.}
 
 proc toggle_sync*(apu: GbApu) =
   apu.sync = not apu.sync
@@ -78,7 +79,9 @@ proc get_sample*(apu: GbApu; gb: GB) =
      (if (apu.nr51 and 0x04) != 0: c3 else: 0.0'f32) +
      (if (apu.nr51 and 0x02) != 0: c2 else: 0.0'f32) +
      (if (apu.nr51 and 0x01) != 0: c1 else: 0.0'f32)) / 4.0'f32
-  when defined(emscripten):
+  when defined(test_harness):
+    discard
+  elif defined(emscripten):
     appendAudioSample(sample_left, sample_right)
   else:
     apu.buffer[apu.buffer_pos]     = sample_left
@@ -105,7 +108,9 @@ proc new_gb_apu*(gb: GB; headless: bool): GbApu =
   result.channel2 = new_channel2(gb)
   result.channel3 = new_channel3(gb)
   result.channel4 = new_channel4(gb)
-  when defined(emscripten):
+  when defined(test_harness):
+    result.audio_dev = 0
+  elif defined(emscripten):
     result.audio_dev = 0  # JS handles playback via Web Audio API
   else:
     var desired = SDL_AudioSpec(

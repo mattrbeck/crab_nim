@@ -3,6 +3,8 @@
 
 import std/[options, times, os, strutils]
 import ../common/[util, input, scheduler, emu, resampler]
+when defined(test_harness):
+  import ../common/test_output
 import lut_macros
 
 # Include register definitions (provides PSR, DISPCNT, etc.)
@@ -307,6 +309,8 @@ type
     ppu*:        PPU
     apu*:        APU
     dma*:        DMA
+    when defined(test_harness):
+      test_output*: TestOutput
 
 # ==================== INCLUDE IMPLEMENTATIONS ====================
 

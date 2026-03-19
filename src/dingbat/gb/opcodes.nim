@@ -518,7 +518,17 @@ var UNPREFIXED* = [
 
   # 0x40 LD B,B
   proc(cpu: GbCpu; gb: GB): int =
-    cpu_inc_pc(cpu); cpu.b = cpu.b; 4,
+    cpu_inc_pc(cpu); cpu.b = cpu.b
+    when defined(test_harness):
+      if gb.test_output != nil:
+        if cpu.b == 3 and cpu.c == 5 and cpu.d == 8 and
+           cpu.e == 13 and cpu.h == 21 and cpu.l == 34:
+          gb.test_output.mooneye_result = 0
+          gb.test_output.finished = true
+        else:
+          gb.test_output.mooneye_result = 1
+          gb.test_output.finished = true
+    4,
 
   # 0x41 LD B,C
   proc(cpu: GbCpu; gb: GB): int =

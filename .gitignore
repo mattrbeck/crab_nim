@@ -23,3 +23,5 @@ web/rom.gbc
 
 # Native binary (root-level only)
 /dingbat
+/dingbat_test
+/dingbat_test_runner

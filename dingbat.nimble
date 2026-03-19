@@ -16,3 +16,7 @@ requires "stb_image"
 
 task wasm, "Build the WASM/Emscripten target":
   exec "nim c -d:emscripten src/dingbat_wasm.nim"
+
+task test_build, "Build the test harness":
+  exec "nim c -d:test_harness -d:release --path:src -o:dingbat_test tests/dingbat_test.nim"
+  exec "nim c -d:test_harness -d:release --path:src --path:tests -o:dingbat_test_runner tests/dingbat_test_runner.nim"
