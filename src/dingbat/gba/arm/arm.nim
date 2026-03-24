@@ -39,6 +39,24 @@ proc hle_swi*(cpu: CPU; swi_num: uint32) =
     cpu.gba.interrupts.reg_if.vblank = false
     cpu.gba.interrupts.reg_ie.vblank = true
     cpu.halted = true
+  of 0x08:  # Sqrt
+    let val = cpu.r[0]
+    if val == 0:
+      cpu.r[0] = 0
+    else:
+      var result_val: uint32 = 0
+      var bit_val: uint32 = 1'u32 shl 30
+      var num = val
+      while bit_val > num:
+        bit_val = bit_val shr 2
+      while bit_val != 0:
+        if num >= result_val + bit_val:
+          num -= result_val + bit_val
+          result_val = (result_val shr 1) + bit_val
+        else:
+          result_val = result_val shr 1
+        bit_val = bit_val shr 2
+      cpu.r[0] = result_val
   of 0x0B:  # CpuSet
     var src = cpu.r[0]
     var dst = cpu.r[1]
