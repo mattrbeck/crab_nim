@@ -1,20 +1,31 @@
 # ARM instruction handlers (included by gba.nim)
 
-proc bios_arctan(a: int32): int32 =
-  ## GBA BIOS ArcTan polynomial approximation (standard HLE coefficients).
-  ## Input: tan value in 1.14 fixed-point (signed).
-  ## Output: theta where 0x4000 = pi/2.
-  let a64 = int64(a)
-  let neg_a_sq = -((a64 * a64) shr 14)
-  var r3 = (int64(0xA9) * neg_a_sq) shr 14
-  r3 = ((r3 + 0x0390) * neg_a_sq) shr 14
-  r3 = ((r3 + 0x091C) * neg_a_sq) shr 14
-  r3 = ((r3 + 0x0FB6) * neg_a_sq) shr 14
-  r3 = ((r3 + 0x16AA) * neg_a_sq) shr 14
-  r3 = ((r3 + 0x2081) * neg_a_sq) shr 14
-  r3 = ((r3 + 0x3651) * neg_a_sq) shr 14
-  r3 = r3 + 0xA2F9
-  result = cast[int32](uint32((a64 * r3) shr 14))
+proc mul32(a, b: int32): int32 {.inline.} =
+  ## Wrapping 32-bit multiply matching ARM `mul` instruction (low 32 bits).
+  cast[int32](cast[uint32](cast[int64](a) * cast[int64](b)))
+
+proc bios_arctan(cpu: CPU) =
+  ## GBA BIOS ArcTan (SWI 0x09) polynomial approximation.
+  ## Matches the real BIOS: 32-bit wrapping arithmetic, ASR shifts.
+  ## Input:  r0 = tan value in 1.14 fixed-point (signed).
+  ## Output: r0 = arctan result (0x4000 = pi/2),
+  ##         r1 = -(input^2 >> 14),  r3 = polynomial accumulator.
+  let a = cast[int32](cpu.r[0])
+  var r1 = mul32(a, a)
+  r1 = ashr(r1, 14)
+  r1 = -r1  # neg_a_sq
+  var r3 = mul32(0xA9'i32, r1)
+  r3 = ashr(r3, 14)
+  r3 = r3 + 0x0390'i32; r3 = mul32(r3, r1); r3 = ashr(r3, 14)
+  r3 = r3 + 0x091C'i32; r3 = mul32(r3, r1); r3 = ashr(r3, 14)
+  r3 = r3 + 0x0FB6'i32; r3 = mul32(r3, r1); r3 = ashr(r3, 14)
+  r3 = r3 + 0x16AA'i32; r3 = mul32(r3, r1); r3 = ashr(r3, 14)
+  r3 = r3 + 0x2081'i32; r3 = mul32(r3, r1); r3 = ashr(r3, 14)
+  r3 = r3 + 0x3651'i32; r3 = mul32(r3, r1); r3 = ashr(r3, 14)
+  r3 = r3 + 0xA2F9'i32
+  cpu.r[0] = cast[uint32](ashr(mul32(r3, a), 16))
+  cpu.r[1] = cast[uint32](r1)
+  cpu.r[3] = cast[uint32](r3)
 
 proc hle_swi*(cpu: CPU; swi_num: uint32) =
   ## HLE BIOS dispatch for the most common GBA SWI calls.
@@ -80,30 +91,60 @@ proc hle_swi*(cpu: CPU; swi_num: uint32) =
         bit_val = bit_val shr 2
       cpu.r[0] = result_val
   of 0x09:  # ArcTan
-    cpu.r[0] = cast[uint32](bios_arctan(cast[int32](cpu.r[0])))
+    bios_arctan(cpu)
   of 0x0A:  # ArcTan2
-    let x = cast[int16](cpu.r[0] and 0xFFFF)
-    let y = cast[int16](cpu.r[1] and 0xFFFF)
-    if x == 0 and y == 0:
-      cpu.r[0] = 0
-    elif y == 0:
-      cpu.r[0] = if x > 0: 0'u32 else: 0x8000'u32
+    ## Matches real BIOS: full 32-bit signed inputs, same branching logic.
+    let x = cast[int32](cpu.r[0])
+    let y = cast[int32](cpu.r[1])
+    if y == 0:
+      if x >= 0:
+        cpu.r[0] = 0
+      else:
+        cpu.r[0] = 0x8000'u32
     elif x == 0:
-      cpu.r[0] = if y > 0: 0x4000'u32 else: 0xC000'u32
+      if y >= 0:
+        cpu.r[0] = 0x4000'u32
+      else:
+        cpu.r[0] = 0xC000'u32
     else:
-      if abs(int32(x)) > abs(int32(y)):
-        cpu.r[0] = cast[uint32](bios_arctan((int32(y) shl 14) div int32(x)))
-        if x < 0:
-          if y >= 0:
+      if y > 0:
+        if x > 0:
+          if x >= y:
+            cpu.r[0] = cast[uint32]((int64(y) shl 14) div int64(x))
+            bios_arctan(cpu)
+          else:
+            cpu.r[0] = cast[uint32]((int64(x) shl 14) div int64(y))
+            bios_arctan(cpu)
+            cpu.r[0] = 0x4000'u32 - cpu.r[0]
+        else: # x < 0
+          if -x >= y:
+            cpu.r[0] = cast[uint32]((int64(y) shl 14) div int64(x))
+            bios_arctan(cpu)
             cpu.r[0] = cpu.r[0] + 0x8000'u32
           else:
-            cpu.r[0] = cpu.r[0] - 0x8000'u32
-      else:
-        cpu.r[0] = cast[uint32](bios_arctan((int32(x) shl 14) div int32(y)))
-        if y > 0:
-          cpu.r[0] = 0x4000'u32 - cpu.r[0]
-        else:
-          cpu.r[0] = 0xC000'u32 - cpu.r[0]
+            cpu.r[0] = cast[uint32]((int64(x) shl 14) div int64(y))
+            bios_arctan(cpu)
+            cpu.r[0] = 0x4000'u32 - cpu.r[0]
+      else: # y < 0
+        if x > 0:
+          if x >= -y:
+            cpu.r[0] = cast[uint32]((int64(y) shl 14) div int64(x))
+            bios_arctan(cpu)
+            cpu.r[0] = cpu.r[0] + 0x10000'u32
+          else:
+            cpu.r[0] = cast[uint32]((int64(x) shl 14) div int64(y))
+            bios_arctan(cpu)
+            cpu.r[0] = 0xC000'u32 - cpu.r[0]
+        else: # x <= 0
+          if -x > -y:
+            cpu.r[0] = cast[uint32]((int64(y) shl 14) div int64(x))
+            bios_arctan(cpu)
+            cpu.r[0] = cpu.r[0] + 0x8000'u32
+          else:
+            cpu.r[0] = cast[uint32]((int64(x) shl 14) div int64(y))
+            bios_arctan(cpu)
+            cpu.r[0] = 0xC000'u32 - cpu.r[0]
+    cpu.r[3] = 0x170'u32
   of 0x0B:  # CpuSet
     var src = cpu.r[0]
     var dst = cpu.r[1]
@@ -121,17 +162,21 @@ proc hle_swi*(cpu: CPU; swi_num: uint32) =
         if not fill: src += 4
         dst += 4
     else:
-      src = src and not 1'u32
       dst = dst and not 1'u32
-      let fill_val = cpu.gba.bus.read_half(src)
+      let fill_val = if bit(src, 0): uint16(cpu.gba.bus[src])
+                     else: cpu.gba.bus.read_half(src)
       for i in 0'u32 ..< count:
-        let val = if fill: fill_val else: cpu.gba.bus.read_half(src)
+        let val = if fill: fill_val
+                  elif bit(src, 0): uint16(cpu.gba.bus[src])
+                  else: cpu.gba.bus.read_half(src)
         cpu.gba.bus.write_half(dst, val)
         if not fill: src += 2
         dst += 2
+    cpu.r[0] = src
+    cpu.r[1] = dst
   of 0x0C:  # CpuFastSet
-    var src = cpu.r[0]
-    var dst = cpu.r[1]
+    var src = cpu.r[0] and not 3'u32
+    var dst = cpu.r[1] and not 3'u32
     let ctrl = cpu.r[2]
     let count = (bits_range(ctrl, 0, 20) + 7) and not 7'u32  # round up to multiple of 8
     let fill = bit(ctrl, 24)
@@ -141,6 +186,8 @@ proc hle_swi*(cpu: CPU; swi_num: uint32) =
       cpu.gba.bus.write_word(dst, val)
       if not fill: src += 4
       dst += 4
+    cpu.r[0] = src
+    cpu.r[1] = dst
   else:
     discard  # unimplemented SWI: return immediately (no-op)
 
