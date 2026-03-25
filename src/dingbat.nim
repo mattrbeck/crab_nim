@@ -86,6 +86,7 @@ proc print_help() =
   echo ""
   echo "Options:"
   echo "  -h, --help       Show this help message"
+  echo "  --hle            Use HLE BIOS (no external BIOS file needed)"
   echo "  --run-bios       Run the BIOS on startup"
   echo "  --skip-bios      Skip the BIOS on startup (default)"
   echo "  --version        Print version"
@@ -474,6 +475,7 @@ proc main() =
   var rom_path     = ""
   var cli_run_bios = false
   var has_bios_arg = false
+  var use_hle      = false
   var pos_args: seq[string]
 
   var p = initOptParser(commandLineParams())
@@ -485,6 +487,7 @@ proc main() =
       case p.key
       of "h", "help":  print_help(); system.quit(0)
       of "version":    echo VERSION; system.quit(0)
+      of "hle":        use_hle = true
       of "run-bios":   cli_run_bios = true
       of "skip-bios":  cli_run_bios = false
       else: echo "Unknown option: --" & p.key; system.quit(1)
@@ -498,7 +501,8 @@ proc main() =
   else: echo "Too many arguments."; system.quit(1)
 
   let cfg = load_config()
-  if has_bios_arg: cfg.bios_path = bios_path
+  if use_hle: cfg.bios_path = ""
+  elif has_bios_arg: cfg.bios_path = bios_path
   if cli_run_bios: cfg.run_bios = true
 
   # SDL2 init
