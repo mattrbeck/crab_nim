@@ -501,7 +501,9 @@ proc main() =
   else: echo "Too many arguments."; system.quit(1)
 
   let cfg = load_config()
-  if use_hle: cfg.use_hle = true
+  if use_hle:
+    cfg.use_hle = true
+    cfg.run_bios = false
   if has_bios_arg: cfg.bios_path = bios_path
   if cli_run_bios: cfg.run_bios = true
 
