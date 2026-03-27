@@ -104,14 +104,18 @@ proc main() =
   let test_out = new_test_output()
 
   if is_gba:
-    let is_hle = bios_path == "hle"
+    let is_hle = bios_path == "hle" or bios_path == ""
     let actual_bios = if is_hle: "" else: bios_path
     let emu = new_gba(actual_bios, rom_path, run_bios = false, use_hle = is_hle)
     emu.test_output = test_out
     emu.post_init()
     for frame in 0 ..< timeout_frames:
       if test_out.finished: break
-      emu.step_frame()
+      try:
+        emu.step_frame()
+      except:
+        stderr.writeLine("Emulator exception at frame " & $frame & ": " & getCurrentExceptionMsg())
+        break
       if mode == tmMgba and test_out.mgba_debug_output.len > 0:
         let output = test_out.mgba_debug_output
         if output.contains("FAIL") or output.contains("PASS") or

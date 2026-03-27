@@ -61,6 +61,8 @@ proc `[]=`*(tim: Timer; io_addr: uint32; value: uint8) =
       let was_enabled = tim.tmcnt[num].enable
       let was_cascade = tim.tmcnt[num].cascade
       write(tim.tmcnt[num], value, 0)
+      if num == 0:
+        tim.tmcnt[0].cascade = false
       if tim.tmcnt[num].enable:
         if not was_enabled:
           tim.tm[num] = tim.tmd[num]
