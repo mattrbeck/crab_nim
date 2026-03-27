@@ -1,7 +1,5 @@
 # APU implementation (included by gba.nim)
 
-var dbg_nonzero_sample_count = 0  # DBG: track first non-zero DMA samples
-
 const APU_CHANNELS*       = 2
 const APU_BUFFER_SIZE*    = 1024
 const APU_SAMPLE_RATE*    = 32768
@@ -68,6 +66,7 @@ proc new_apu*(gba: GBA): APU =
     frame_sequencer_stage: 0,
     first_half_of_length_period: false,
     sync: true,
+    channel_mask: [true, true, true, true, true, true],
   )
   result.buffer = newSeq[int16](APU_BUFFER_SIZE)
   result.channel1 = new_channel1(gba)
@@ -138,21 +137,21 @@ proc tick_frame_sequencer*(apu: APU) =
 proc get_sample*(apu: APU) =
   if apu.soundcnt_h.sound_volume >= 3:
     raise newException(Exception, "Prohibited sound 1-4 volume " & $apu.soundcnt_h.sound_volume)
+  let ch1 = if apu.channel_mask[0]: apu.channel1.ch1_get_amplitude() else: 0'i16
+  let ch2 = if apu.channel_mask[1]: apu.channel2.ch2_get_amplitude() else: 0'i16
+  let ch3 = if apu.channel_mask[2]: apu.channel3.ch3_get_amplitude() else: 0'i16
+  let ch4 = if apu.channel_mask[3]: apu.channel4.ch4_get_amplitude() else: 0'i16
   let psg_sound =
-    apu.channel1.ch1_get_amplitude() * int16(apu.soundcnt_l.channel_1_left) +
-    apu.channel2.ch2_get_amplitude() * int16(apu.soundcnt_l.channel_2_left) +
-    apu.channel3.ch3_get_amplitude() * int16(apu.soundcnt_l.channel_3_left) +
-    apu.channel4.ch4_get_amplitude() * int16(apu.soundcnt_l.channel_4_left)
+    ch1 * int16(apu.soundcnt_l.channel_1_left) +
+    ch2 * int16(apu.soundcnt_l.channel_2_left) +
+    ch3 * int16(apu.soundcnt_l.channel_3_left) +
+    ch4 * int16(apu.soundcnt_l.channel_4_left)
   let shift = 5 - int(apu.soundcnt_h.sound_volume)
   let psg_left  = int32(psg_sound) * int32(apu.soundcnt_l.left_volume) shr shift
   let psg_right = int32(psg_sound) * int32(apu.soundcnt_l.right_volume) shr shift
-  let (dma_a, dma_b) = apu.dma_channels.dma_channels_get_amplitude()
-  if dbg_nonzero_sample_count < 5 and (dma_a != 0 or dma_b != 0):
-    echo "DBG first DMA sample #", dbg_nonzero_sample_count,
-         ": dma_a=", dma_a, " dma_b=", dma_b,
-         " fifo_a_size=", apu.dma_channels.sizes[0],
-         " fifo_b_size=", apu.dma_channels.sizes[1]
-    dbg_nonzero_sample_count += 1
+  let (raw_dma_a, raw_dma_b) = apu.dma_channels.dma_channels_get_amplitude()
+  let dma_a = if apu.channel_mask[4]: raw_dma_a else: 0'i16
+  let dma_b = if apu.channel_mask[5]: raw_dma_b else: 0'i16
   let dma_a_scaled = int32(dma_a) shl apu.soundcnt_h.dma_sound_a_volume
   let dma_b_scaled = int32(dma_b) shl apu.soundcnt_h.dma_sound_b_volume
   let dma_left  = dma_a_scaled * int32(apu.soundcnt_h.dma_sound_a_left)  + dma_b_scaled * int32(apu.soundcnt_h.dma_sound_b_left)
@@ -220,7 +219,6 @@ proc `[]=`*(apu: APU; io_addr: uint32; value: uint8) =
     of 0x81: apu.soundcnt_l = cast[SOUNDCNT_L]((uint16(apu.soundcnt_l) and 0x00FF'u16) or (uint16(value) shl 8))
     of 0x82:
       apu.soundcnt_h = cast[SOUNDCNT_H]((uint16(apu.soundcnt_h) and 0xFF00'u16) or (uint16(value) and 0x0F'u16))  # bits 4-7 unused
-      echo "DBG SOUNDCNT_H[lo]=0x", toHex(value, 2), " → 0x", toHex(uint16(apu.soundcnt_h), 4)
     of 0x83:
       # Bits 3,7 (= register bits 11,15) are write-only FIFO reset triggers
       if bit(value, 3):  # FIFO A reset
@@ -234,14 +232,12 @@ proc `[]=`*(apu: APU; io_addr: uint32; value: uint8) =
         apu.dma_channels.sizes[1] = 0
         apu.dma_channels.latches[1] = 0
       apu.soundcnt_h = cast[SOUNDCNT_H]((uint16(apu.soundcnt_h) and 0x00FF'u16) or ((uint16(value) and 0x77'u16) shl 8))
-      echo "DBG SOUNDCNT_H[hi]=0x", toHex(value, 2), " → 0x", toHex(uint16(apu.soundcnt_h), 4)
     of 0x84:
       if (value and 0x80) == 0 and apu.sound_enabled:
         for addr in 0x60'u32..0x81'u32:
           apu[addr] = 0x00'u8
         apu.sound_enabled = false
       elif (value and 0x80) > 0 and not apu.sound_enabled:
-        echo "DBG sound re-enabled (SOUNDCNT_X write 0x84)"
         apu.sound_enabled = true
         apu.frame_sequencer_stage = 0
         apu.channel1.length_counter = 0

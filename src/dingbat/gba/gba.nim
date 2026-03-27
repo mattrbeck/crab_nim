@@ -110,7 +110,6 @@ type
     dst*:       array[4, uint32]
     dmacnt_l*:  array[4, uint16]
     dmacnt_h*:  array[4, DMACNT]
-    fifo_trigger_count*: array[2, int]  # DBG: count first few FIFO triggers
   RtcState* = enum
     rtcWaiting, rtcCommand, rtcReading, rtcWriting
 
@@ -298,6 +297,7 @@ type
     channel4*:          Channel4
     dma_channels*:      DMAChannels
     sync*:              bool
+    channel_mask*:      array[6, bool]  # PSG 1-4 + DMA A/B; true = enabled
     audio_dev*:         uint32  # SDL2 AudioDeviceID (0 = not open)
     left_resampler*:    Resampler[float32]
     right_resampler*:   Resampler[float32]

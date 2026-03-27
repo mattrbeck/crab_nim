@@ -421,6 +421,11 @@ proc handle_input() =
           app.gba_emu.handle_input(app.cfg.keybindings[sym], pressed)
         elif sym == K_TAB and pressed:
           app.gba_emu.apu.sync = not app.gba_emu.apu.sync
+        elif pressed and sym >= K_1 and sym <= K_6:
+          let ch = int(sym) - int(K_1)
+          app.gba_emu.apu.channel_mask[ch] = not app.gba_emu.apu.channel_mask[ch]
+          const names = ["PSG1", "PSG2", "PSG3", "PSG4", "DMA-A", "DMA-B"]
+          echo names[ch], if app.gba_emu.apu.channel_mask[ch]: " ON" else: " OFF"
       elif app.emu_kind == ekGB and app.gb_emu != nil:
         if app.cfg.keybindings.hasKey(sym):
           app.gb_emu.handle_input(app.cfg.keybindings[sym], pressed)
