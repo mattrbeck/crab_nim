@@ -39,10 +39,20 @@ type
     timed_out: bool
 
 
+proc has_rom_files(dir: string): bool =
+  ## Check if a directory tree contains at least one .gb ROM file.
+  for path in walkDirRec(dir):
+    if path.endsWith(".gb"):
+      return true
+  false
+
 proc ensure_gameboy_test_roms(): string =
   let dir = RomCacheDir / "game-boy-test-roms"
-  if dirExists(dir):
+  if dirExists(dir) and has_rom_files(dir):
     return dir
+  if dirExists(dir):
+    echo "Cached game-boy-test-roms directory has no ROMs, re-downloading..."
+    removeDir(dir)
   echo "Downloading game-boy-test-roms release..."
   createDir(dir)
   let url = "https://github.com/c-sp/game-boy-test-roms/releases/download/v7.0/game-boy-test-roms-v7.0.zip"
