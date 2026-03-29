@@ -75,15 +75,27 @@ proc fill_pipeline*(cpu: CPU) {.inline.} =
   if cpu.cpsr.thumb:
     let pc = cpu.r[15] and not 1'u32
     if cpu.pipeline.size == 0:
-      cpu.pipeline.push(uint32(cpu.gba.bus.read_half(pc - 2)))
+      let v = uint32(cpu.gba.bus.read_half(pc - 2))
+      if bits_range(pc - 2, 24, 27) == 0:
+        cpu.gba.bus.bios_latch = v or (v shl 16)
+      cpu.pipeline.push(v)
     if cpu.pipeline.size == 1:
-      cpu.pipeline.push(uint32(cpu.gba.bus.read_half(pc)))
+      let v = uint32(cpu.gba.bus.read_half(pc))
+      if bits_range(pc, 24, 27) == 0:
+        cpu.gba.bus.bios_latch = v or (v shl 16)
+      cpu.pipeline.push(v)
   else:
     let pc = cpu.r[15] and not 3'u32
     if cpu.pipeline.size == 0:
-      cpu.pipeline.push(cpu.gba.bus.read_word(pc - 4))
+      let v = cpu.gba.bus.read_word(pc - 4)
+      if bits_range(pc - 4, 24, 27) == 0:
+        cpu.gba.bus.bios_latch = v
+      cpu.pipeline.push(v)
     if cpu.pipeline.size == 1:
-      cpu.pipeline.push(cpu.gba.bus.read_word(pc))
+      let v = cpu.gba.bus.read_word(pc)
+      if bits_range(pc, 24, 27) == 0:
+        cpu.gba.bus.bios_latch = v
+      cpu.pipeline.push(v)
 
 proc clear_pipeline*(cpu: CPU) =
   cpu.pipeline.clear()
@@ -96,10 +108,18 @@ proc read_instr*(cpu: CPU): uint32 {.inline.} =
   if cpu.pipeline.size == 0:
     if cpu.cpsr.thumb:
       cpu.r[15] = cpu.r[15] and not 1'u32
-      uint32(cpu.gba.bus.read_half(cpu.r[15] - 4))
+      let fetch_addr = cpu.r[15] - 4
+      let v = uint32(cpu.gba.bus.read_half(fetch_addr))
+      if bits_range(fetch_addr, 24, 27) == 0:
+        cpu.gba.bus.bios_latch = v or (v shl 16)
+      v
     else:
       cpu.r[15] = cpu.r[15] and not 3'u32
-      cpu.gba.bus.read_word(cpu.r[15] - 8)
+      let fetch_addr = cpu.r[15] - 8
+      let v = cpu.gba.bus.read_word(fetch_addr)
+      if bits_range(fetch_addr, 24, 27) == 0:
+        cpu.gba.bus.bios_latch = v
+      v
   else:
     cpu.pipeline.shift()
 

@@ -58,8 +58,15 @@ proc write_u32_ptr(buf: var seq[byte]; offset: uint32; val: uint32) {.inline.} =
 
 proc read_byte_internal*(bus: Bus; address: uint32): uint8 {.inline.} =
   case bits_range(address, 24, 27)
-  of 0x0: bus.bios[address and 0x3FFF'u32]
-  of 0x1: 0'u8  # open bus todo
+  of 0x0:
+    if bits_range(bus.gba.cpu.r[15], 24, 27) == 0:
+      bus.bios[address and 0x3FFF'u32]
+    else:
+      # BIOS reads are latched to last successful read
+      # https://rust-console.github.io/gbatek-gbaonly/#reading-from-bios-memory-00000000-00003fff
+      let shift = (address and 3) * 8
+      uint8(bus.bios_latch shr shift)
+  of 0x1: bus.read_open_bus_value(address)
   of 0x2: bus.wram_board[address and 0x3FFFF'u32]
   of 0x3: bus.wram_chip[address and 0x7FFF'u32]
   of 0x4: bus.gba.mmio[address]
@@ -83,8 +90,15 @@ proc read_half_internal*(bus: Bus; address: uint32): uint16 {.inline.} =
   let orig = address
   let address = address and not 1'u32
   case bits_range(address, 24, 27)
-  of 0x0: read_u16_ptr(bus.bios, address and 0x3FFF'u32)
-  of 0x1: 0'u16
+  of 0x0:
+    if bits_range(bus.gba.cpu.r[15], 24, 27) == 0:
+      read_u16_ptr(bus.bios, address and 0x3FFF'u32)
+    else:
+      # BIOS reads are latched to last successful read
+      # https://rust-console.github.io/gbatek-gbaonly/#reading-from-bios-memory-00000000-00003fff
+      let shift = (address and 2) * 8
+      uint16(bus.bios_latch shr shift)
+  of 0x1: uint16(bus.read_open_bus_value(address)) or (uint16(bus.read_open_bus_value(address or 1)) shl 8)
   of 0x2: read_u16_ptr(bus.wram_board, address and 0x3FFFF'u32)
   of 0x3: read_u16_ptr(bus.wram_chip, address and 0x7FFF'u32)
   of 0x4:
@@ -110,8 +124,18 @@ proc read_word_internal*(bus: Bus; address: uint32): uint32 {.inline.} =
   let orig = address
   let address = address and not 3'u32
   case bits_range(address, 24, 27)
-  of 0x0: read_u32_ptr(bus.bios, address and 0x3FFF'u32)
-  of 0x1: 0'u32
+  of 0x0:
+    if bits_range(bus.gba.cpu.r[15], 24, 27) == 0:
+      read_u32_ptr(bus.bios, address and 0x3FFF'u32)
+    else:
+      # BIOS reads are latched to last successful read
+      # https://rust-console.github.io/gbatek-gbaonly/#reading-from-bios-memory-00000000-00003fff
+      bus.bios_latch
+  of 0x1:
+    let v = bus.read_open_bus_value(address)
+    uint32(v) or (uint32(bus.read_open_bus_value(address or 1)) shl 8) or
+    (uint32(bus.read_open_bus_value(address or 2)) shl 16) or
+    (uint32(bus.read_open_bus_value(address or 3)) shl 24)
   of 0x2: read_u32_ptr(bus.wram_board, address and 0x3FFFF'u32)
   of 0x3: read_u32_ptr(bus.wram_chip, address and 0x7FFF'u32)
   of 0x4:

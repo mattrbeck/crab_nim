@@ -142,6 +142,7 @@ type
     wram_board*: seq[byte]
     wram_chip*:  seq[byte]
     gpio*:       GPIO
+    bios_latch*: uint32
 
   WLInstrKind* = enum
     wlLongBranchLink, wlUnconditionalBranch, wlSoftwareInterrupt,
