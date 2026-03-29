@@ -47,10 +47,10 @@ proc write_save*(st: Storage) =
     st.dirty = false
 
 proc read_half*(st: Storage; address: uint32): uint16 =
-  0x0101'u16 * uint16(st[address and not 1'u32])
+  0x0101'u16 * uint16(st[address])
 
 proc read_word*(st: Storage; address: uint32): uint32 =
-  0x01010101'u32 * uint32(st[address and not 3'u32])
+  0x01010101'u32 * uint32(st[address])
 
 proc eeprom_at*(st: Storage; address: uint32): bool =
   st of EEPROM and (address >= 0x0D000000'u32 and address <= 0x0DFFFFFF'u32)

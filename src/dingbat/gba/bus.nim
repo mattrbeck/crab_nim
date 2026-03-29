@@ -80,6 +80,7 @@ proc read_byte_internal*(bus: Bus; address: uint32): uint8 {.inline.} =
   else: raise newException(Exception, "Unmapped bus read: " & hex_str(address))
 
 proc read_half_internal*(bus: Bus; address: uint32): uint16 {.inline.} =
+  let orig = address
   let address = address and not 1'u32
   case bits_range(address, 24, 27)
   of 0x0: read_u16_ptr(bus.bios, address and 0x3FFF'u32)
@@ -102,10 +103,11 @@ proc read_half_internal*(bus: Bus; address: uint32): uint16 {.inline.} =
       uint16(bus.gba.storage[address])
     else:
       read_u16_ptr(bus.gba.cartridge.rom, address and 0x01FFFFFF'u32)
-  of 0xE, 0xF: bus.gba.storage.read_half(address)
+  of 0xE, 0xF: bus.gba.storage.read_half(orig)
   else: raise newException(Exception, "Unmapped bus read_half: " & hex_str(address))
 
 proc read_word_internal*(bus: Bus; address: uint32): uint32 {.inline.} =
+  let orig = address
   let address = address and not 3'u32
   case bits_range(address, 24, 27)
   of 0x0: read_u32_ptr(bus.bios, address and 0x3FFF'u32)
@@ -130,7 +132,7 @@ proc read_word_internal*(bus: Bus; address: uint32): uint32 {.inline.} =
       uint32(bus.gba.storage[address])
     else:
       read_u32_ptr(bus.gba.cartridge.rom, address and 0x01FFFFFF'u32)
-  of 0xE, 0xF: bus.gba.storage.read_word(address)
+  of 0xE, 0xF: bus.gba.storage.read_word(orig)
   else: raise newException(Exception, "Unmapped bus read_word: " & hex_str(address))
 
 proc write_byte_internal*(bus: Bus; address: uint32; value: uint8) =
@@ -160,6 +162,7 @@ proc write_byte_internal*(bus: Bus; address: uint32; value: uint8) =
 
 proc write_half_internal*(bus: Bus; address: uint32; value: uint16) =
   if bits_range(address, 28, 31) > 0: return
+  let orig = address
   let address = address and not 1'u32
   if address <= bus.gba.cpu.r[15] and address >= bus.gba.cpu.r[15] - 4:
     bus.gba.cpu.fill_pipeline()
@@ -181,12 +184,12 @@ proc write_half_internal*(bus: Bus; address: uint32; value: uint16) =
     elif bus.gba.storage.eeprom_at(address):
       bus.gba.storage[address] = uint8(value)
   of 0xE, 0xF:
-    bus.write_byte_internal(address, uint8(value))
-    bus.write_byte_internal(address + 1, uint8(value shr 8))
+    bus.gba.storage[orig] = uint8(value)
   else: log("Unmapped write half: " & hex_str(address))
 
 proc write_word_internal*(bus: Bus; address: uint32; value: uint32) =
   if bits_range(address, 28, 31) > 0: return
+  let orig = address
   let address = address and not 3'u32
   if address <= bus.gba.cpu.r[15] and address >= bus.gba.cpu.r[15] - 4:
     bus.gba.cpu.fill_pipeline()
@@ -210,10 +213,7 @@ proc write_word_internal*(bus: Bus; address: uint32; value: uint32) =
     elif bus.gba.storage.eeprom_at(address):
       bus.gba.storage[address] = uint8(value)
   of 0xE, 0xF:
-    bus.write_byte_internal(address,     uint8(value))
-    bus.write_byte_internal(address + 1, uint8(value shr 8))
-    bus.write_byte_internal(address + 2, uint8(value shr 16))
-    bus.write_byte_internal(address + 3, uint8(value shr 24))
+    bus.gba.storage[orig] = uint8(value)
   else: log("Unmapped write word: " & hex_str(address))
 
 # ---- Public read/write with cycle accounting ----
