@@ -32,6 +32,8 @@
           <button type="button" class="menu-item" id="load-save">Load Save</button>
           <button type="button" class="menu-item" id="export-save">Export Save</button>
           <hr class="menu-sep" />
+          <button type="button" class="menu-item" id="open-keyboard">Keyboard</button>
+          <hr class="menu-sep" />
           <button type="button" class="menu-item" id="force-update">Force Update</button>
           <hr class="menu-sep" />
           <button type="button" class="menu-item" id="show-log">Toggle Log</button>
@@ -92,6 +94,25 @@
         <div class="modal-footer">
           <span id="storage-info"></span>
           <button type="button" class="button" id="recent-close">Close</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="keyboard-modal" class="modal-overlay">
+      <div class="modal">
+        <h3>Keyboard</h3>
+        <div class="modal-row">
+          <span>Preset:</span>
+          <select id="kb-preset" class="kb-select">
+            <option value="default">Default</option>
+            <option value="homerow">Home-row</option>
+            <option value="custom">Custom</option>
+          </select>
+        </div>
+        <div id="kb-bindings"></div>
+        <div class="modal-actions">
+          <button type="button" class="button" id="kb-cancel">Cancel</button>
+          <button type="button" class="button button-primary" id="kb-save">Save</button>
         </div>
       </div>
     </div>

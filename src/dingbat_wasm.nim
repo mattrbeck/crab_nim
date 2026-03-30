@@ -9,20 +9,24 @@ const GBA_H = 160
 const GB_W  = 160
 const GB_H  = 144
 
-# SDL keycodes matching the default keybindings and reference HTML virtual controls.
-# Emscripten maps JS keycodes (uppercase ASCII for printable keys) to SDL keycodes
-# (lowercase ASCII), so these match the keycode= attributes in index.html.
-const KEYBINDINGS: array[10, (cint, Input)] = [
-  (cint(101), Input.UP),     # e
-  (cint(100), Input.DOWN),   # d
-  (cint(115), Input.LEFT),   # s
-  (cint(102), Input.RIGHT),  # f
-  (cint(107), Input.A),      # k
-  (cint(106), Input.B),      # j
-  (cint(108), Input.SELECT), # l
-  (cint(59),  Input.START),  # semicolon
-  (cint(119), Input.L),      # w
-  (cint(114), Input.R),      # r
+# Scancode constants and mask for non-printable keys (arrows, F-keys, etc.)
+const SDLK_SCANCODE_MASK = cint(1 shl 30)
+const SC_RIGHT = cint(79); const SC_LEFT = cint(80)
+const SC_DOWN  = cint(81); const SC_UP   = cint(82)
+
+# Default keybindings: mgba-style (arrow keys, Z/X, A/S, Backspace, Return).
+# Mutable so JS can update bindings at runtime via setKeybindingForInput().
+var KEYBINDINGS: array[10, (cint, Input)] = [
+  (SC_UP    or SDLK_SCANCODE_MASK, Input.UP),
+  (SC_DOWN  or SDLK_SCANCODE_MASK, Input.DOWN),
+  (SC_LEFT  or SDLK_SCANCODE_MASK, Input.LEFT),
+  (SC_RIGHT or SDLK_SCANCODE_MASK, Input.RIGHT),
+  (cint(122), Input.A),      # z
+  (cint(120), Input.B),      # x
+  (cint(8),   Input.SELECT), # backspace
+  (cint(13),  Input.START),  # return
+  (cint(97),  Input.L),      # a
+  (cint(115), Input.R),      # s
 ]
 
 type EmuKind = enum ekNone, ekGBA, ekGB
@@ -62,6 +66,14 @@ proc setInput(inputId: cint; pressed: cint) {.exportc.} =
   of ekGBA: stateGba.handle_input(inp, down)
   of ekGB:  stateGb.handle_input(inp, down)
   of ekNone: discard
+
+proc setKeybindingForInput(inputId: cint; keycode: cint) {.exportc.} =
+  if inputId < 0 or inputId > ord(Input.high): return
+  let inp = Input(inputId)
+  for i in 0..<KEYBINDINGS.len:
+    if KEYBINDINGS[i][1] == inp:
+      KEYBINDINGS[i] = (keycode, inp)
+      return
 
 proc checkInput() =
   var evt = defaultEvent

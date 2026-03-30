@@ -151,10 +151,22 @@ proc input_from_name(name: string): Input =
 const CONFIG_DIR  = "~/.config/dingbat"
 const CONFIG_FILE = CONFIG_DIR & "/dingbat.yml"
 
-# Default keybindings: SDL keycode → Input
-# Matches Crystal defaults (config.cr): E=UP, D=DOWN, S=LEFT, F=RIGHT, K=A, J=B,
-#   L=SELECT, SEMICOLON=START, W=L, R=R
+# Default keybindings: SDL keycode → Input (mgba-style)
+# Arrow keys=D-pad, Z=A, X=B, Backspace=SELECT, Return=START, A=L, S=R
 proc default_keybindings*(): Table[cint, Input] =
+  result = initTable[cint, Input]()
+  result[key_name_to_code("up")]        = Input.UP
+  result[key_name_to_code("down")]      = Input.DOWN
+  result[key_name_to_code("left")]      = Input.LEFT
+  result[key_name_to_code("right")]     = Input.RIGHT
+  result[key_name_to_code("z")]         = Input.A
+  result[key_name_to_code("x")]         = Input.B
+  result[key_name_to_code("backspace")] = Input.SELECT
+  result[key_name_to_code("return")]    = Input.START
+  result[key_name_to_code("a")]         = Input.L
+  result[key_name_to_code("s")]         = Input.R
+
+proc homerow_keybindings*(): Table[cint, Input] =
   result = initTable[cint, Input]()
   result[key_name_to_code("e")]         = Input.UP
   result[key_name_to_code("d")]         = Input.DOWN

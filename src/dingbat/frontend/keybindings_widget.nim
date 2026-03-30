@@ -45,7 +45,20 @@ proc find_key_for_input(w: KeybindingsWidget; inp: Input): cint =
     if v == inp: return k
   return -1
 
+proc load_preset(w: KeybindingsWidget; bindings: Table[cint, Input]) =
+  w.editing = initTable[cint, Input]()
+  for k, v in bindings.pairs:
+    w.editing[k] = v
+  w.selection = none(Input)
+
 proc render*(w: KeybindingsWidget) =
+  if igBeginCombo("Preset", "Select preset...", 0):
+    if igSelectable_Bool("Default", false, 0, ImVec2(x: 0, y: 0)):
+      w.load_preset(default_keybindings())
+    if igSelectable_Bool("Home-row", false, 0, ImVec2(x: 0, y: 0)):
+      w.load_preset(homerow_keybindings())
+    igEndCombo()
+
   let btn_size = ImVec2(x: 48, y: 0)
   for inp in Input:
     let selected = w.selection.isSome() and w.selection.get() == inp

@@ -459,6 +459,10 @@ recentModal.addEventListener("click", (e) => {
 // Close any open modal on Escape
 document.addEventListener("keydown", (e) => {
   if (e.key === "Escape") {
+    // Don't close keyboard modal if we're rebinding — the capture handler will eat it
+    if (!keyboardModal.classList.contains("open") || kbSelection < 0) {
+      closeKeyboardModal();
+    }
     closeBiosModal();
     closeRecentModal();
     closeUpdateModal();
@@ -541,6 +545,199 @@ const setVolume = (v) => {
 
 volDown.addEventListener("click", () => setVolume(volume - 10));
 volUp.addEventListener("click", () => setVolume(volume + 10));
+
+// --- Keyboard settings ---
+
+const INPUT_NAMES = ["Up", "Down", "Left", "Right", "A", "B", "Select", "Start", "L", "R"];
+
+// event.code → SDL keycode mapping (covers common bindable keys)
+const JS_TO_SDL = (() => {
+  const m = {
+    ArrowUp: 0x40000052, ArrowDown: 0x40000051,
+    ArrowLeft: 0x40000050, ArrowRight: 0x4000004F,
+    Backspace: 8, Tab: 9, Enter: 13, Escape: 27, Space: 32,
+    Comma: 44, Minus: 45, Period: 46, Slash: 47,
+    Digit0: 48, Digit1: 49, Digit2: 50, Digit3: 51, Digit4: 52,
+    Digit5: 53, Digit6: 54, Digit7: 55, Digit8: 56, Digit9: 57,
+    Semicolon: 59, Equal: 61, BracketLeft: 91, Backslash: 92,
+    BracketRight: 93, Backquote: 96, Delete: 127,
+    CapsLock: 0x40000039,
+    F1: 0x4000003A, F2: 0x4000003B, F3: 0x4000003C, F4: 0x4000003D,
+    F5: 0x4000003E, F6: 0x4000003F, F7: 0x40000040, F8: 0x40000041,
+    F9: 0x40000042, F10: 0x40000043, F11: 0x40000044, F12: 0x40000045,
+    ShiftLeft: 0x400000E1, ShiftRight: 0x400000E5,
+    ControlLeft: 0x400000E0, ControlRight: 0x400000E4,
+    AltLeft: 0x400000E2, AltRight: 0x400000E6,
+  };
+  // Letter keys: KeyA-KeyZ → 97-122
+  for (let i = 0; i < 26; i++) {
+    m["Key" + String.fromCharCode(65 + i)] = 97 + i;
+  }
+  return m;
+})();
+
+// Reverse: SDL keycode → display name
+const SDL_TO_NAME = (() => {
+  const m = {
+    0x40000052: "\u2191", 0x40000051: "\u2193",
+    0x40000050: "\u2190", 0x4000004F: "\u2192",
+    8: "Backspace", 9: "Tab", 13: "Return", 27: "Escape", 32: "Space",
+    44: ",", 45: "-", 46: ".", 47: "/",
+    59: ";", 61: "=", 91: "[", 92: "\\", 93: "]", 96: "`", 127: "Delete",
+  };
+  for (let i = 0; i < 10; i++) m[48 + i] = String(i);
+  for (let i = 0; i < 26; i++) m[97 + i] = String.fromCharCode(65 + i);
+  return m;
+})();
+
+// Presets: array of 10 SDL keycodes indexed by Input enum order
+const PRESET_DEFAULT = [
+  0x40000052, 0x40000051, 0x40000050, 0x4000004F, // Up Down Left Right
+  122, 120, 8, 13, 97, 115 // Z X Backspace Return A S
+];
+const PRESET_HOMEROW = [
+  101, 100, 115, 102, // E D S F
+  107, 106, 108, 59, 119, 114 // K J L ; W R
+];
+
+// Current active keybindings (SDL keycodes indexed by input ID)
+var activeBindings = [...PRESET_DEFAULT];
+
+// Build reverse lookup: event.code → input ID (for JS-side keyboard handling)
+var codeLookup = {};
+const rebuildLookup = () => {
+  codeLookup = {};
+  for (let i = 0; i < activeBindings.length; i++) {
+    // Find the event.code that maps to this SDL keycode
+    for (let [code, sdl] of Object.entries(JS_TO_SDL)) {
+      if (sdl === activeBindings[i]) {
+        codeLookup[code] = i;
+        break;
+      }
+    }
+  }
+};
+rebuildLookup();
+
+// JS-side keyboard handler: intercepts bound keys before Emscripten's SDL layer
+// and calls _setInput directly. This is authoritative for keyboard input.
+const gameKeyHandler = (e, down) => {
+  if (keyboardModal.classList.contains("open")) return;
+  let inputId = codeLookup[e.code];
+  if (inputId !== undefined && typeof Module !== "undefined" && Module._setInput) {
+    e.preventDefault();
+    e.stopImmediatePropagation();
+    Module._setInput(inputId, down ? 1 : 0);
+  }
+};
+document.addEventListener("keydown", (e) => gameKeyHandler(e, true), true);
+document.addEventListener("keyup", (e) => gameKeyHandler(e, false), true);
+
+const keyboardModal = document.getElementById("keyboard-modal");
+const kbBindingsDiv = document.getElementById("kb-bindings");
+const kbPreset = document.getElementById("kb-preset");
+
+var kbEditing = [...PRESET_DEFAULT]; // temp editing state
+var kbSelection = -1; // which input is selected for rebinding (-1 = none)
+
+const sdlName = (code) => SDL_TO_NAME[code] || "???";
+
+const detectPreset = (bindings) => {
+  if (bindings.every((v, i) => v === PRESET_DEFAULT[i])) return "default";
+  if (bindings.every((v, i) => v === PRESET_HOMEROW[i])) return "homerow";
+  return "custom";
+};
+
+const renderKbBindings = () => {
+  kbBindingsDiv.innerHTML = "";
+  for (let i = 0; i < INPUT_NAMES.length; i++) {
+    let row = document.createElement("div");
+    row.className = "kb-row";
+    let btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "kb-btn" + (kbSelection === i ? " active" : "");
+    btn.textContent = sdlName(kbEditing[i]);
+    btn.addEventListener("click", () => {
+      kbSelection = i;
+      renderKbBindings();
+    });
+    let label = document.createElement("span");
+    label.textContent = INPUT_NAMES[i];
+    row.appendChild(btn);
+    row.appendChild(label);
+    kbBindingsDiv.appendChild(row);
+  }
+};
+
+const kbKeyHandler = (e) => {
+  if (kbSelection < 0) return;
+  let sdl = JS_TO_SDL[e.code];
+  if (sdl === undefined) return;
+  e.preventDefault();
+  e.stopImmediatePropagation();
+  // Remove any existing binding for this key
+  for (let i = 0; i < kbEditing.length; i++) {
+    if (kbEditing[i] === sdl) kbEditing[i] = -1;
+  }
+  kbEditing[kbSelection] = sdl;
+  // Auto-advance to next input
+  if (kbSelection < INPUT_NAMES.length - 1) {
+    kbSelection++;
+  } else {
+    kbSelection = -1;
+  }
+  kbPreset.value = detectPreset(kbEditing);
+  renderKbBindings();
+};
+
+const openKeyboardModal = () => {
+  menuDropdown.hidden = true;
+  kbEditing = [...activeBindings];
+  kbSelection = -1;
+  kbPreset.value = detectPreset(kbEditing);
+  renderKbBindings();
+  keyboardModal.classList.add("open");
+  document.addEventListener("keydown", kbKeyHandler, true);
+};
+
+const closeKeyboardModal = () => {
+  kbSelection = -1;
+  keyboardModal.classList.remove("open");
+  document.removeEventListener("keydown", kbKeyHandler, true);
+};
+
+const applyKeybindings = (bindings) => {
+  activeBindings = [...bindings];
+  rebuildLookup();
+};
+
+const saveKeybindings = async () => {
+  applyKeybindings(kbEditing);
+  await dbPut("keybindings", activeBindings);
+  closeKeyboardModal();
+};
+
+const loadKeybindingsFromStorage = async () => {
+  let stored = await dbGet("keybindings");
+  if (stored && stored.length === INPUT_NAMES.length) {
+    applyKeybindings(stored);
+  }
+};
+
+document.getElementById("open-keyboard").addEventListener("click", openKeyboardModal);
+document.getElementById("kb-save").addEventListener("click", saveKeybindings);
+document.getElementById("kb-cancel").addEventListener("click", closeKeyboardModal);
+
+keyboardModal.addEventListener("click", (e) => {
+  if (e.target === keyboardModal) closeKeyboardModal();
+});
+
+kbPreset.addEventListener("change", () => {
+  if (kbPreset.value === "default") kbEditing = [...PRESET_DEFAULT];
+  else if (kbPreset.value === "homerow") kbEditing = [...PRESET_HOMEROW];
+  kbSelection = -1;
+  renderKbBindings();
+});
 
 var currentRomName = null;
 var currentOriginalName = null;
@@ -645,6 +842,7 @@ var Module = {
     await openDB();
     await migrateFromLocalStorage();
     await loadBiosFromStorage();
+    await loadKeybindingsFromStorage();
     let frameCount = 0;
     const SAMPLE_RATE = 32768; // GBA/GB native sample rate
     const TARGET_FPS = 59.7275;

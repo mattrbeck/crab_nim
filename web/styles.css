@@ -460,6 +460,46 @@ body {
   background-color: #3a9aef;
 }
 
+.kb-select {
+  background-color: var(--alt-color);
+  color: var(--text-color);
+  border: 1px solid var(--accent-color);
+  padding: 4px 10px;
+  cursor: pointer;
+  font-size: 14px;
+}
+
+.kb-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+
+.kb-row span {
+  min-width: 60px;
+  font-size: 14px;
+}
+
+.kb-btn {
+  min-width: 80px;
+  text-align: center;
+  background-color: var(--alt-color);
+  color: var(--text-color);
+  border: 1px solid var(--accent-color);
+  padding: 4px 10px;
+  cursor: pointer;
+  font-size: 14px;
+}
+
+.kb-btn:hover {
+  background-color: var(--accent-color);
+}
+
+.kb-btn.active {
+  background-color: var(--accent-color);
+}
+
 #drop-overlay {
   position: fixed;
   inset: 0;
