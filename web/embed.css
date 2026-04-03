@@ -55,6 +55,14 @@ body {
   #canvas { width: 1440px; height: 960px; }
 }
 
+/* --- Fill mode: disable integer scaling, stretch to viewport --- */
+
+#canvas.fill {
+  width: 100vw;
+  height: 100vh;
+  object-fit: contain;
+}
+
 /* --- Wrapper: positions overlay on top of canvas --- */
 
 #wrapper {

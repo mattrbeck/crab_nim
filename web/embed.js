@@ -1,3 +1,16 @@
+// --- Query parameters ---
+
+const params = new URLSearchParams(window.location.search);
+const integerScaling = params.get("integer-scaling") !== "false";
+const demoMode = params.has("demo");
+
+// --- Integer scaling toggle ---
+
+if (!integerScaling) {
+  const canvas = document.getElementById("canvas");
+  canvas.classList.add("fill");
+}
+
 // --- Emulator state ---
 
 var volume = 0;
@@ -236,6 +249,21 @@ var Module = {
       source.start(playTime);
       playTime += buffer.duration;
     };
+
+    // --- Demo ROM auto-load ---
+    if (demoMode) {
+      fetch("goodboy-demo-en.gba")
+        .then((res) => {
+          if (!res.ok) throw new Error("Failed to fetch demo ROM");
+          return res.arrayBuffer();
+        })
+        .then((buf) => {
+          let bytes = new Uint8Array(buf);
+          writeToFS("rom.gba", bytes);
+          loadRom("rom.gba", "goodboy-demo-en.gba");
+        })
+        .catch((err) => console.error("Demo ROM load failed:", err));
+    }
 
     // --- Game loop ---
     const tick = (timestamp) => {
