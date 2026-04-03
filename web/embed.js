@@ -91,12 +91,20 @@ const fastForwardButton = document.getElementById("fast-forward");
 const iconPause = document.getElementById("icon-pause");
 const iconPlay = document.getElementById("icon-play");
 const overlay = document.getElementById("overlay");
+let overlayTimer = null;
 
 const updatePauseIcon = () => {
   iconPause.style.display = paused ? "none" : "";
   iconPlay.style.display = paused ? "" : "none";
   // Pin the overlay open while paused so the user can see the play button
   overlay.classList.toggle("pinned", paused);
+  // When unpausing on mobile, start auto-hide; when pausing, cancel timer
+  if (paused) {
+    clearTimeout(overlayTimer);
+  } else if (overlay.classList.contains("visible")) {
+    clearTimeout(overlayTimer);
+    overlayTimer = setTimeout(() => overlay.classList.remove("visible"), 2000);
+  }
 };
 
 pauseButton.addEventListener("click", () => {
@@ -174,6 +182,50 @@ volIconBtn.addEventListener("click", () => {
 
 // Initialize volume UI
 updateVolumeUI();
+
+// --- Touch overlay (YouTube-style show/hide) ---
+
+const wrapper = document.getElementById("wrapper");
+
+const showOverlay = () => {
+  overlay.classList.add("visible");
+  clearTimeout(overlayTimer);
+  if (!paused) {
+    overlayTimer = setTimeout(() => overlay.classList.remove("visible"), 2000);
+  }
+};
+
+const hideOverlay = () => {
+  clearTimeout(overlayTimer);
+  overlay.classList.remove("visible");
+};
+
+// Tapping the canvas shows the overlay
+wrapper.addEventListener("touchstart", (e) => {
+  if (e.target === document.getElementById("canvas")) {
+    showOverlay();
+  }
+}, { passive: true });
+
+// Tapping empty space in the overlay dismisses it
+overlay.addEventListener("touchstart", (e) => {
+  if (e.target === overlay || e.target === document.getElementById("controls") || e.target === document.getElementById("volume")) {
+    e.preventDefault();
+    hideOverlay();
+  }
+});
+
+// Reset the auto-hide timer when interacting with controls
+const resetOverlayTimer = () => {
+  if (overlay.classList.contains("visible") && !paused) {
+    clearTimeout(overlayTimer);
+    overlayTimer = setTimeout(() => overlay.classList.remove("visible"), 2000);
+  }
+};
+
+[pauseButton, resetButton, fastForwardButton, volIconBtn, volTrack].forEach(
+  (el) => el.addEventListener("touchstart", resetOverlayTimer, { passive: true })
+);
 
 // --- Emscripten Module ---
 

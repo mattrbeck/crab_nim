@@ -88,8 +88,15 @@ body {
   pointer-events: none;
 }
 
-#wrapper:hover #overlay,
-#overlay.pinned {
+@media (hover: hover) {
+  #wrapper:hover #overlay {
+    opacity: 1;
+    pointer-events: auto;
+  }
+}
+
+#overlay.pinned,
+#overlay.visible {
   opacity: 1;
   pointer-events: auto;
 }
