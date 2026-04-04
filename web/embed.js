@@ -271,10 +271,13 @@ var Module = {
         src.buffer = silentBuf;
         src.connect(audioCtx.destination);
         src.start(0);
+        let a = new Audio("data:audio/wav;base64,UklGRiYAAABXQVZFZm10IBAAAAABAAEARKwAAIhYAQACABAAZGF0YQIAAAAAAA==");
+        a.play().catch(() => {});
       }
     };
     document.addEventListener("click", resumeAudio, { once: false });
     document.addEventListener("keydown", resumeAudio, { once: false });
+    document.addEventListener("touchstart", resumeAudio, { once: false });
 
     const MAX_AUDIO_LEAD = 0.04; // max seconds audio can be scheduled ahead
 
