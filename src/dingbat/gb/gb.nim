@@ -172,6 +172,9 @@ type
     dropped_first_fetch*: bool
     fetching_window*:     bool
     fetching_sprite*:     bool
+    sprite_fetch_phase*:  int
+    bg_pixels_pushed*:    bool
+    scx_penalty_remaining*: int
     tile_num*:            uint8
     tile_attrs*:          uint8
     tile_data_low*:       uint8
@@ -291,9 +294,9 @@ type
       test_output*:  TestOutput
 
 # ==================== FETCHER ORDER ====================
-const FETCHER_ORDER*: array[7, FetchStage] = [
+const FETCHER_ORDER*: array[8, FetchStage] = [
   fsSleep, fsGetTile, fsSleep, fsGetTileDataLow,
-  fsSleep, fsGetTileDataHigh, fsPushPixel,
+  fsSleep, fsGetTileDataHigh, fsSleep, fsPushPixel,
 ]
 
 # DMG default colors (BGR555)
